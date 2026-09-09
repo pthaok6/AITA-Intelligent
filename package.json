@@ -1,0 +1,14 @@
+{
+  "name": "aita-intelligent-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:backend": "npm.cmd --prefix apps/backend run dev",
+    "dev:frontend": "npm.cmd --prefix apps/frontend run dev",
+    "build:backend": "npm.cmd --prefix apps/backend run build",
+    "build:frontend": "npm.cmd --prefix apps/frontend run build"
+  }
+}
