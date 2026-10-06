@@ -20,6 +20,8 @@ class AutogradingService {
             console.error(`[AutogradingService] Submission not found: ${submissionId}`);
             return;
         }
+        if (submission.status === enums_1.SubmissionStatus.COMPLETED)
+            return;
         // 1. Cập nhật trạng thái RUNNING
         await this.submissionRepo.updateStatus(submissionId, enums_1.SubmissionStatus.RUNNING, {
             startedAt: new Date(),
@@ -68,6 +70,7 @@ class AutogradingService {
                 completedAt: new Date(),
                 compileMessage: error.message || 'Lỗi không xác định trong quá trình chấm',
             });
+            throw error;
         }
     }
 }

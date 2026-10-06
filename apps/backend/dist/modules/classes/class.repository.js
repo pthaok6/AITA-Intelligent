@@ -9,8 +9,9 @@ class ClassRepository {
             include: { lecturer: { select: { id: true, fullName: true, email: true } } },
         });
     }
-    async findAll() {
+    async findAll(lecturerId) {
         return prisma_1.prisma.class.findMany({
+            where: lecturerId ? { lecturerId } : undefined,
             include: {
                 lecturer: { select: { id: true, fullName: true, email: true } },
                 _count: { select: { enrollments: true, exams: true } },

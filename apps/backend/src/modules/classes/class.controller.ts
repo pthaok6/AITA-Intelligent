@@ -34,15 +34,15 @@ classRouter.post('/', authenticateJwt, requireRoles(UserRole.LECTURER, UserRole.
 classRouter.get('/:id', authenticateJwt, async (req: AuthRequest, res: Response) => {
   try {
     const classId = req.params.id as string;
-    const cls = await classService.getClassDetails(classId);
+    const cls = await classService.getClassDetails(classId, req.user);
     res.status(200).json({ success: true, data: cls });
   } catch (error: any) {
-    res.status(404).json({ success: false, message: error.message });
+    res.status(error.status || 404).json({ success: false, message: error.message });
   }
 });
 
 // Sinh viên tham gia lớp học
-classRouter.post('/:id/enroll', authenticateJwt, async (req: AuthRequest, res: Response) => {
+classRouter.post('/:id/enroll', authenticateJwt, requireRoles(UserRole.STUDENT), async (req: AuthRequest, res: Response) => {
   try {
     const classId = req.params.id as string;
     await classService.enrollStudent(classId, req.user!.userId);

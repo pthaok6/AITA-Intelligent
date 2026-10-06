@@ -123,6 +123,7 @@ export const LecturerDashboard: React.FC = () => {
                 Số sinh viên: {cls._count?.enrollments || 0} • Đề thi: {cls._count?.exams || 0}
               </p>
               <div style={{ display: 'flex', gap: '0.75rem' }}>
+                <Link to={`/lecturer/classes/${cls.id}/import-students`} className="btn btn-secondary">Import sinh viên</Link>
                 <Link to={`/lecturer/classes/${cls.id}/create-exam`} className="btn btn-primary" style={{ flex: 1 }}>
                   + Tạo đề thi
                 </Link>

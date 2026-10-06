@@ -6,9 +6,17 @@
     "apps/*"
   ],
   "scripts": {
+    "start": "node scripts/dev.cjs",
+    "dev": "node scripts/dev.cjs",
     "dev:backend": "npm.cmd --prefix apps/backend run dev",
     "dev:frontend": "npm.cmd --prefix apps/frontend run dev",
     "build:backend": "npm.cmd --prefix apps/backend run build",
-    "build:frontend": "npm.cmd --prefix apps/frontend run build"
+    "build:frontend": "npm.cmd --prefix apps/frontend run build",
+    "db:up": "docker compose up -d --wait postgres redis",
+    "db:stop": "docker compose stop postgres redis",
+    "db:logs": "docker compose logs --tail 50 postgres",
+    "db:setup": "npm.cmd --prefix apps/backend run prisma:setup",
+    "db:studio": "npm.cmd --prefix apps/backend run prisma:studio",
+    "dev:worker": "npm.cmd --prefix apps/backend run dev:worker"
   }
 }

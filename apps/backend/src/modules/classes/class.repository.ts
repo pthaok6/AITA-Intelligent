@@ -8,8 +8,9 @@ export class ClassRepository {
     });
   }
 
-  async findAll() {
+  async findAll(lecturerId?: string) {
     return prisma.class.findMany({
+      where: lecturerId ? { lecturerId } : undefined,
       include: {
         lecturer: { select: { id: true, fullName: true, email: true } },
         _count: { select: { enrollments: true, exams: true } },

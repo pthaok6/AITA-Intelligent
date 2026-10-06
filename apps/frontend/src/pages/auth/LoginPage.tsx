@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
+import { GoogleSignIn } from '../../components/GoogleSignIn';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -24,7 +25,7 @@ export const LoginPage: React.FC = () => {
     setLoading(false);
     if (res.success && res.data) {
       login(res.data.token, res.data.user);
-      if (res.data.user.role === 'LECTURER') {
+      if (res.data.user.role !== 'STUDENT') {
         navigate('/lecturer');
       } else {
         navigate('/student');
@@ -45,11 +46,11 @@ export const LoginPage: React.FC = () => {
         )}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Email FPT</label>
+            <label>Email</label>
             <input
               type="email"
               className="form-control"
-              placeholder="ten@fpt.edu.vn"
+              placeholder="ten@gmail.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -70,6 +71,7 @@ export const LoginPage: React.FC = () => {
             {loading ? 'Đang xác thực...' : 'Đăng nhập'}
           </button>
         </form>
+        <GoogleSignIn password={password} />
         <p style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.875rem', color: '#94a3b8' }}>
           Chưa có tài khoản? <Link to="/register">Đăng ký ngay</Link>
         </p>

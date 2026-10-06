@@ -35,15 +35,15 @@ exports.classRouter.post('/', auth_middleware_1.authenticateJwt, (0, auth_middle
 exports.classRouter.get('/:id', auth_middleware_1.authenticateJwt, async (req, res) => {
     try {
         const classId = req.params.id;
-        const cls = await class_service_1.classService.getClassDetails(classId);
+        const cls = await class_service_1.classService.getClassDetails(classId, req.user);
         res.status(200).json({ success: true, data: cls });
     }
     catch (error) {
-        res.status(404).json({ success: false, message: error.message });
+        res.status(error.status || 404).json({ success: false, message: error.message });
     }
 });
 // Sinh viên tham gia lớp học
-exports.classRouter.post('/:id/enroll', auth_middleware_1.authenticateJwt, async (req, res) => {
+exports.classRouter.post('/:id/enroll', auth_middleware_1.authenticateJwt, (0, auth_middleware_1.requireRoles)(enums_1.UserRole.STUDENT), async (req, res) => {
     try {
         const classId = req.params.id;
         await class_service_1.classService.enrollStudent(classId, req.user.userId);

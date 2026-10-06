@@ -1,7 +1,9 @@
 import crypto from 'crypto';
 import { submissionRepository, SubmissionRepository } from './submission.repository';
 import { examRepository, ExamRepository } from '../exams/exam.repository';
-import { defaultJobQueue, InMemoryJobQueue } from '../../infrastructure/queue/in-memory-job-queue';
+import { defaultJobQueue } from '../../infrastructure/queue/bullmq-job-queue';
+import { prisma } from '../../infrastructure/database/prisma';
+import { HttpError } from '../../shared/http';
 import { IJobQueue } from '../../infrastructure/queue/job-queue.interface';
 
 export class SubmissionService {
@@ -16,6 +18,9 @@ export class SubmissionService {
     if (!exam) {
       throw new Error('Không tìm thấy bài thi');
     }
+    const enrollment = await prisma.classEnrollment.findUnique({ where: { classId_studentId: { classId: exam.classId, studentId } } });
+    const student = await prisma.user.findUnique({ where: { id: studentId } });
+    if (!enrollment || enrollment.status !== 'ACTIVE' || student?.role !== 'STUDENT') throw new HttpError(403, 'Chỉ sinh viên thuộc lớp mới được nộp bài.');
 
     const now = new Date();
     if (now < exam.startTime) {
@@ -37,7 +42,12 @@ export class SubmissionService {
     });
 
     // Đẩy job vào IJobQueue
-    await this.queue.addJob('grading-queue', { submissionId: submission.id });
+    try { await this.queue.addJob('grading-queue', { submissionId: submission.id }); }
+    catch (error: any) {
+      // PostgreSQL is the durable receipt; recovery re-enqueues this QUEUED row.
+      console.error('[Submission enqueue pending]', submission.id, error.message);
+      return { ...submission, queuePending: true };
+    }
 
     return submission;
   }

@@ -1,6 +1,8 @@
 import { Response, Router } from 'express';
 import { submissionService } from './submission.service';
 import { authenticateJwt, AuthRequest } from '../../middlewares/auth.middleware';
+import { classAccess } from '../classes/class-access';
+import { examService } from '../exams/exam.service';
 
 export const submissionRouter = Router();
 
@@ -22,7 +24,7 @@ submissionRouter.post('/exams/:examId/submissions', authenticateJwt, async (req:
 
     res.status(201).json({ success: true, data: submission });
   } catch (error: any) {
-    res.status(400).json({ success: false, message: error.message });
+    res.status(error.status || 400).json({ success: false, message: error.message });
   }
 });
 
@@ -31,9 +33,10 @@ submissionRouter.get('/submissions/:id', authenticateJwt, async (req: AuthReques
   try {
     const submissionId = req.params.id as string;
     const submission = await submissionService.getSubmission(submissionId);
+    if (submission.studentId !== req.user!.userId) await classAccess(submission.exam.classId, req.user!, true);
     res.status(200).json({ success: true, data: submission });
   } catch (error: any) {
-    res.status(404).json({ success: false, message: error.message });
+    res.status(error.status || 404).json({ success: false, message: error.message });
   }
 });
 
@@ -41,9 +44,11 @@ submissionRouter.get('/submissions/:id', authenticateJwt, async (req: AuthReques
 submissionRouter.get('/exams/:examId/submissions', authenticateJwt, async (req: AuthRequest, res: Response) => {
   try {
     const examId = req.params.examId as string;
+    const exam = await examService.getExamById(examId);
+    await classAccess(exam.classId, req.user!, true);
     const submissions = await submissionService.getSubmissionsByExam(examId);
     res.status(200).json({ success: true, data: submissions });
   } catch (error: any) {
-    res.status(400).json({ success: false, message: error.message });
+    res.status(error.status || 400).json({ success: false, message: error.message });
   }
 });

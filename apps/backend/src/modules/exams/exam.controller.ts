@@ -2,6 +2,7 @@ import { Response, Router } from 'express';
 import { examService } from './exam.service';
 import { authenticateJwt, AuthRequest, requireRoles } from '../../middlewares/auth.middleware';
 import { UserRole } from '../../domain/enums';
+import { classAccess } from '../classes/class-access';
 
 export const examRouter = Router();
 
@@ -9,10 +10,11 @@ export const examRouter = Router();
 examRouter.get('/class/:classId', authenticateJwt, async (req: AuthRequest, res: Response) => {
   try {
     const classId = req.params.classId as string;
+    await classAccess(classId, req.user!);
     const exams = await examService.getExamsByClass(classId);
     res.status(200).json({ success: true, data: exams });
   } catch (error: any) {
-    res.status(400).json({ success: false, message: error.message });
+    res.status(error.status || 400).json({ success: false, message: error.message });
   }
 });
 
@@ -24,6 +26,7 @@ examRouter.post('/', authenticateJwt, requireRoles(UserRole.LECTURER, UserRole.A
       res.status(400).json({ success: false, message: 'Vui lòng điền đủ thông tin bài thi bắt buộc' });
       return;
     }
+    await classAccess(classId, req.user!, true);
     const exam = await examService.createExam({
       classId,
       title,
@@ -37,7 +40,7 @@ examRouter.post('/', authenticateJwt, requireRoles(UserRole.LECTURER, UserRole.A
     });
     res.status(201).json({ success: true, data: exam });
   } catch (error: any) {
-    res.status(400).json({ success: false, message: error.message });
+    res.status(error.status || 400).json({ success: false, message: error.message });
   }
 });
 
@@ -47,9 +50,10 @@ examRouter.get('/:id', authenticateJwt, async (req: AuthRequest, res: Response) 
     const examId = req.params.id as string;
     const isLecturer = req.user?.role === UserRole.LECTURER || req.user?.role === UserRole.ADMIN;
     const exam = await examService.getExamById(examId, isLecturer);
+    await classAccess(exam.classId, req.user!);
     res.status(200).json({ success: true, data: exam });
   } catch (error: any) {
-    res.status(404).json({ success: false, message: error.message });
+    res.status(error.status || 404).json({ success: false, message: error.message });
   }
 });
 
@@ -57,6 +61,8 @@ examRouter.get('/:id', authenticateJwt, async (req: AuthRequest, res: Response) 
 examRouter.post('/:id/testcases', authenticateJwt, requireRoles(UserRole.LECTURER, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     const examId = req.params.id as string;
+    const exam = await examService.getExamById(examId);
+    await classAccess(exam.classId, req.user!, true);
     const { inputData, expectedOutput, isHidden, scoreWeight, orderIndex } = req.body;
     const tc = await examService.addTestCase(examId, {
       inputData,
@@ -67,6 +73,6 @@ examRouter.post('/:id/testcases', authenticateJwt, requireRoles(UserRole.LECTURE
     });
     res.status(201).json({ success: true, data: tc });
   } catch (error: any) {
-    res.status(400).json({ success: false, message: error.message });
+    res.status(error.status || 400).json({ success: false, message: error.message });
   }
 });

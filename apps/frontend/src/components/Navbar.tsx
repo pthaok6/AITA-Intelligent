@@ -1,14 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 export const Navbar: React.FC = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [logoutError, setLogoutError] = useState('');
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handleLogout = async () => {
+    setLogoutError('');
+    if (await logout()) navigate('/login');
+    else setLogoutError('Đăng xuất chưa thành công. Vui lòng thử lại.');
   };
 
   return (
@@ -26,6 +28,7 @@ export const Navbar: React.FC = () => {
         </div>
 
         <div>
+          {logoutError && <p role="alert">{logoutError}</p>}
           {isAuthenticated ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <span style={{ fontSize: '0.875rem' }}>

@@ -22,6 +22,7 @@ Toàn bộ mô hình tuân thủ nghiêm ngặt **Dạng chuẩn 3 (Third Normal
 ```mermaid
 erDiagram
     USERS ||--o{ CLASSES : "creates (Lecturer)"
+    USERS ||--o{ AUTH_SESSIONS : "authenticates (JWT/refresh)"
     USERS ||--o{ CLASS_ENROLLMENTS : "joins (Student)"
     CLASSES ||--o{ CLASS_ENROLLMENTS : "has"
     CLASSES ||--o{ EXAMS : "contains"
@@ -236,6 +237,22 @@ Lưu kết quả nhận xét Clean Code, nguyên lý SOLID và phân tích ngữ
   | `created_at` | TIMESTAMPTZ | DEFAULT NOW() | Thời điểm thực hiện review |
 
 ---
+
+### Bổ sung triển khai Milestone 2: `auth_sessions`
+
+Schema Prisma hiện có thêm model `AuthSession` để triển khai access JWT 15 phút và refresh token 7 ngày. User có thêm `googleSubject` unique (Google `sub`) và `isActive` để khóa tài khoản.
+
+| Cột trong migration | Ý nghĩa |
+| --- | --- |
+| `id` | ID phiên, JWT tham chiếu bằng claim `sid` |
+| `userId` | FK đến `users.id`, cascade khi xóa user |
+| `refreshTokenHash` | SHA-256 refresh token, unique; không lưu refresh token dạng rõ |
+| `createdAt`, `expiresAt` | Thời điểm tạo và thời hạn tuyệt đối của phiên |
+| `revokedAt` | Thời điểm logout/revoke phiên |
+
+Refresh xoay hash token bằng cập nhật có điều kiện trong SQL transaction; token đã dùng không dùng lại được. Index trên `userId` và `expiresAt`. Các tên cột thực tế theo Prisma camelCase; DDL ví dụ phía dưới mô tả thiết kế lõi trước bổ sung này. Dùng migrations trong `apps/backend/prisma/migrations` làm nguồn triển khai, không chạy song song DDL ví dụ vào database do Prisma quản lý.
+
+Bulk import user và class enrollment chạy trong một transaction Serializable; lỗi ở bất kỳ dòng nào rollback cả batch. Redis/BullMQ quản lý job riêng, không phải model PostgreSQL; submission QUEUED là receipt bền vững để worker phục hồi enqueue khi Redis gián đoạn.
 
 ## IV. ĐẶC TẢ TÍNH TOÀN VẸN DỮ LIỆU & PHÂN ĐỊNH TRÁCH NHIỆM
 

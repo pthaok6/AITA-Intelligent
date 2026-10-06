@@ -7,12 +7,14 @@ exports.submissionService = exports.SubmissionService = void 0;
 const crypto_1 = __importDefault(require("crypto"));
 const submission_repository_1 = require("./submission.repository");
 const exam_repository_1 = require("../exams/exam.repository");
-const in_memory_job_queue_1 = require("../../infrastructure/queue/in-memory-job-queue");
+const bullmq_job_queue_1 = require("../../infrastructure/queue/bullmq-job-queue");
+const prisma_1 = require("../../infrastructure/database/prisma");
+const http_1 = require("../../shared/http");
 class SubmissionService {
     submissionRepo;
     examRepo;
     queue;
-    constructor(submissionRepo = submission_repository_1.submissionRepository, examRepo = exam_repository_1.examRepository, queue = in_memory_job_queue_1.defaultJobQueue) {
+    constructor(submissionRepo = submission_repository_1.submissionRepository, examRepo = exam_repository_1.examRepository, queue = bullmq_job_queue_1.defaultJobQueue) {
         this.submissionRepo = submissionRepo;
         this.examRepo = examRepo;
         this.queue = queue;
@@ -22,6 +24,10 @@ class SubmissionService {
         if (!exam) {
             throw new Error('Không tìm thấy bài thi');
         }
+        const enrollment = await prisma_1.prisma.classEnrollment.findUnique({ where: { classId_studentId: { classId: exam.classId, studentId } } });
+        const student = await prisma_1.prisma.user.findUnique({ where: { id: studentId } });
+        if (!enrollment || enrollment.status !== 'ACTIVE' || student?.role !== 'STUDENT')
+            throw new http_1.HttpError(403, 'Chỉ sinh viên thuộc lớp mới được nộp bài.');
         const now = new Date();
         if (now < exam.startTime) {
             throw new Error('Bài thi chưa bắt đầu');
@@ -39,7 +45,14 @@ class SubmissionService {
             fileHashSha256,
         });
         // Đẩy job vào IJobQueue
-        await this.queue.addJob('grading-queue', { submissionId: submission.id });
+        try {
+            await this.queue.addJob('grading-queue', { submissionId: submission.id });
+        }
+        catch (error) {
+            // PostgreSQL is the durable receipt; recovery re-enqueues this QUEUED row.
+            console.error('[Submission enqueue pending]', submission.id, error.message);
+            return { ...submission, queuePending: true };
+        }
         return submission;
     }
     async getSubmission(submissionId) {

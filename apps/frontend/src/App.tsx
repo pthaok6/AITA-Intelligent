@@ -10,16 +10,19 @@ import { ExamSubmissionsPage } from './pages/lecturer/ExamSubmissionsPage';
 import { StudentDashboard } from './pages/student/StudentDashboard';
 import { ExamTakePage } from './pages/student/ExamTakePage';
 import { SubmissionResultPage } from './pages/student/SubmissionResultPage';
+import { ImportStudentsPage } from './pages/lecturer/ImportStudentsPage';
 
 const RootRedirect: React.FC = () => {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, loading } = useAuth();
+  if (loading) return <p className="container">Đang tải phiên đăng nhập...</p>;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (user?.role === 'LECTURER') return <Navigate to="/lecturer" replace />;
+  if (user?.role !== 'STUDENT') return <Navigate to="/lecturer" replace />;
   return <Navigate to="/student" replace />;
 };
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, loading } = useAuth();
+  if (loading) return <p className="container">Đang tải phiên đăng nhập...</p>;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
     return <Navigate to="/" replace />;
@@ -40,6 +43,7 @@ export const App: React.FC = () => {
               <Route path="/register" element={<RegisterPage />} />
 
               {/* Lecturer Routes */}
+              <Route path="/lecturer/classes/:classId/import-students" element={<ProtectedRoute allowedRoles={['LECTURER', 'ADMIN']}><ImportStudentsPage /></ProtectedRoute>} />
               <Route
                 path="/lecturer"
                 element={

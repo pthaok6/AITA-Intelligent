@@ -7,7 +7,6 @@ export const RegisterPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<'LECTURER' | 'STUDENT'>('STUDENT');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -20,17 +19,13 @@ export const RegisterPage: React.FC = () => {
 
     const res = await apiRequest('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, fullName, password, role }),
+      body: JSON.stringify({ email, fullName, password }),
     });
 
     setLoading(false);
     if (res.success && res.data) {
       login(res.data.token, res.data.user);
-      if (role === 'LECTURER') {
-        navigate('/lecturer');
-      } else {
-        navigate('/student');
-      }
+      navigate('/student');
     } else {
       setError(res.message || 'Đăng ký thất bại');
     }
@@ -58,11 +53,11 @@ export const RegisterPage: React.FC = () => {
             />
           </div>
           <div className="form-group">
-            <label>Email FPT</label>
+            <label>Email</label>
             <input
               type="email"
               className="form-control"
-              placeholder="ten@fpt.edu.vn"
+              placeholder="ten@gmail.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -73,19 +68,13 @@ export const RegisterPage: React.FC = () => {
             <input
               type="password"
               className="form-control"
-              placeholder="Tối thiểu 6 ký tự"
+              placeholder="Tối thiểu 8 ký tự"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
             />
           </div>
-          <div className="form-group">
-            <label>Vai trò hệ thống</label>
-            <select className="form-control" value={role} onChange={(e) => setRole(e.target.value as any)}>
-              <option value="STUDENT">Sinh viên (Nộp bài & Xem điểm)</option>
-              <option value="LECTURER">Giảng viên (Tạo lớp & Đề thi)</option>
-            </select>
-          </div>
+          <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Tài khoản tự đăng ký dành cho sinh viên. Tài khoản giảng viên do quản trị viên cấp.</p>
           <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '0.5rem' }} disabled={loading}>
             {loading ? 'Đang tạo...' : 'Đăng ký'}
           </button>

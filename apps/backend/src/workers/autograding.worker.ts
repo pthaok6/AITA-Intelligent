@@ -1,9 +1,10 @@
-import { defaultJobQueue, InMemoryJobQueue } from '../infrastructure/queue/in-memory-job-queue';
+import { defaultJobQueue } from '../infrastructure/queue/bullmq-job-queue';
+import { IJobQueue } from '../infrastructure/queue/job-queue.interface';
 import { autogradingService, AutogradingService } from '../modules/submissions/autograding.service';
 
 export class AutogradingWorker {
   constructor(
-    private queue: InMemoryJobQueue = defaultJobQueue,
+    private queue: IJobQueue = defaultJobQueue,
     private gradingService: AutogradingService = autogradingService
   ) {}
 
