@@ -16,6 +16,7 @@ class SubmissionRepository {
         return prisma_1.prisma.submission.findUnique({
             where: { id },
             include: {
+                _count: { select: { fingerprints: true } },
                 exam: { select: { id: true, title: true, allowedLanguage: true, classId: true } },
                 student: { select: { id: true, fullName: true, email: true } },
                 testResults: {

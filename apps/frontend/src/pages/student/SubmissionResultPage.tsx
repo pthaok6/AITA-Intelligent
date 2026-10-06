@@ -1,130 +1,58 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const SubmissionResultPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
-  const [submission, setSubmission] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  const fetchSubmission = async () => {
-    const res = await apiRequest(`/submissions/${id}`);
-    if (res.success && res.data) {
-      setSubmission(res.data);
-    }
-    setLoading(false);
-  };
-
+  const { user } = useAuth();
+  const { id } = useParams(); const [submission, setSubmission] = useState<any>(null), [error, setError] = useState('');
   useEffect(() => {
-    fetchSubmission();
-    // Auto-poll nếu trạng thái vẫn đang QUEUED hoặc RUNNING
-    const interval = setInterval(() => {
-      if (submission && (submission.status === 'QUEUED' || submission.status === 'RUNNING')) {
-        fetchSubmission();
-      }
-    }, 1200);
-
-    return () => clearInterval(interval);
-  }, [id, submission?.status]);
-
-  if (loading) return <div className="container"><p>Đang tải kết quả bài nộp...</p></div>;
-  if (!submission) return <div className="container"><p>Không tìm thấy bài nộp.</p></div>;
-
-  const isCompleted = submission.status === 'COMPLETED';
-
-  return (
-    <div className="container" style={{ maxWidth: '850px' }}>
-      <div style={{ marginBottom: '1rem' }}>
-        <Link to="/student">← Quay lại danh sách bài tập</Link>
-      </div>
-
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Phiên nộp bài: #{submission.id.substring(0, 8)}</span>
-            <h2 style={{ fontSize: '1.5rem', marginTop: '0.25rem' }}>{submission.exam?.title}</h2>
-          </div>
-          <div>
-            <span className={`badge ${isCompleted ? 'badge-green' : submission.status === 'RUNNING' ? 'badge-yellow' : 'badge-blue'}`} style={{ fontSize: '0.9rem', padding: '0.4rem 0.8rem' }}>
-              {submission.status}
-            </span>
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginTop: '1.5rem', background: '#090d16', padding: '1rem', borderRadius: '0.5rem' }}>
-          <div>
-            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>TỔNG ĐIỂM</div>
-            <div style={{ fontSize: '1.6rem', fontWeight: 'bold', color: isCompleted ? '#34d399' : '#94a3b8' }}>
-              {submission.totalScore} pts
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>NGÔN NGỮ</div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{submission.exam?.allowedLanguage}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>THỜI ĐIỂM NỘP</div>
-            <div style={{ fontSize: '0.85rem' }}>{new Date(submission.submittedAt).toLocaleTimeString('vi-VN')}</div>
-          </div>
-          <div>
-            <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>HOÀN THÀNH</div>
-            <div style={{ fontSize: '0.85rem' }}>
-              {submission.completedAt ? new Date(submission.completedAt).toLocaleTimeString('vi-VN') : 'Đang xử lý...'}
-            </div>
-          </div>
-        </div>
-
-        {!isCompleted && (
-          <div style={{ marginTop: '1.5rem', textAlign: 'center', padding: '1.5rem', background: 'rgba(59, 130, 246, 0.05)', borderRadius: '0.5rem' }}>
-            <div style={{ display: 'inline-block', width: '24px', height: '24px', border: '3px solid #3b82f6', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-            <p style={{ marginTop: '0.5rem', color: '#60a5fa' }}>Hàng đợi AutogradingWorker đang chạy bài nộp qua Sandbox...</p>
-          </div>
-        )}
-      </div>
-
-      {isCompleted && (
-        <div className="card">
-          <h3>Chi tiết các Test Cases ({submission.testResults?.length || 0})</h3>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Test Case</th>
-                <th>Trạng thái</th>
-                <th>Thời gian</th>
-                <th>Bộ nhớ</th>
-                <th>Điểm đạt được</th>
-              </tr>
-            </thead>
-            <tbody>
-              {submission.testResults?.map((tr: any) => (
-                <tr key={tr.id}>
-                  <td>
-                    <strong>#{tr.testCase?.orderIndex}</strong>
-                    {tr.testCase?.isHidden && <span className="badge badge-yellow" style={{ marginLeft: '0.5rem', fontSize: '0.65rem' }}>ẨN</span>}
-                  </td>
-                  <td>
-                    <span className={`badge ${tr.status === 'ACCEPTED' ? 'badge-green' : 'badge-red'}`}>
-                      {tr.status}
-                    </span>
-                  </td>
-                  <td>{tr.executionTimeMs} ms</td>
-                  <td>{Math.round(tr.memoryUsedKb / 1024)} MB</td>
-                  <td style={{ fontWeight: 600, color: tr.scoreEarned > 0 ? '#34d399' : '#f87171' }}>
-                    +{tr.scoreEarned} pts
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <div className="card" style={{ marginTop: '1.5rem' }}>
-        <h4>Mã nguồn đã nộp</h4>
-        <pre style={{ background: '#090d16', padding: '1rem', borderRadius: '0.5rem', marginTop: '0.5rem', overflowX: 'auto', fontSize: '0.85rem', color: '#e2e8f0', fontFamily: 'monospace' }}>
-          {submission.sourceCodeUrl}
-        </pre>
-      </div>
+    let active = true; let timer: ReturnType<typeof setTimeout>;
+    async function load() {
+      const res = await apiRequest('/submissions/' + id);
+      if (!active) return;
+      if (!res.success) { setError(res.message || 'Không tải được kết quả.'); return; }
+      setSubmission(res.data);
+      if (['QUEUED', 'RUNNING'].includes(res.data.status) || ['PENDING', 'RUNNING'].includes(res.data.astStatus) && ['COMPLETED', 'COMPILE_ERROR'].includes(res.data.status)) timer = setTimeout(load, 1500);
+    }
+    void load(); return () => { active = false; clearTimeout(timer); };
+  }, [id]);
+  if (error) return <div className="container"><p role="alert">{error}</p></div>;
+  if (!submission) return <div className="container">Đang tải kết quả…</div>;
+  const waiting = ['QUEUED', 'RUNNING'].includes(submission.status);
+  return <div className="container" style={{ maxWidth: 1000 }}>
+    <Link to={user?.role === 'STUDENT' ? '/student' : '/lecturer'}>← Dashboard</Link>
+    <div className="card" style={{ marginTop: '1rem' }}>
+      <h2>{submission.exam.title}</h2>
+      <span className={'badge ' + (submission.status === 'COMPLETED' ? 'badge-green' : 'badge-yellow')}>{submission.status}</span>
+      <p><strong>{submission.totalScore} điểm</strong> · {submission.exam.allowedLanguage} · {new Date(submission.submittedAt).toLocaleString('vi-VN')}</p>
+      {waiting && <p>Worker đang xử lý bài nộp. Kết quả sẽ tự cập nhật.</p>}
+      {submission.compileMessage && <details open={submission.status !== 'COMPLETED'}><summary>Thông báo compiler / worker</summary><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{submission.compileMessage}</pre></details>}
+      <h3>Bài nộp</h3><p>{submission.originalFilename || 'Bài nộp cũ'} · {submission.entrypoint}</p>
+      <p style={{ overflowWrap: 'anywhere' }}>SHA-256: <code>{submission.fileHashSha256}</code></p>
+      {submission.artifactType === 'ZIP' && <a href={'/api/submissions/' + id + '/archive'} className="btn btn-secondary">Tải ZIP đã nộp</a>}
+      <ul>{submission.sourceFiles?.map((file: any) => <li key={file.path}>{file.path} ({file.size} bytes)</li>)}</ul>
     </div>
-  );
+    <div className="card" style={{ marginTop: '1rem' }}>
+      <h3>Kết quả test case</h3>
+      <table className="table"><thead><tr><th>Test</th><th>Trạng thái</th><th>Thời gian</th><th>RAM đo được</th><th>Điểm</th></tr></thead>
+        <tbody>{submission.testResults?.map((result: any) => <tr key={result.id}>
+          <td>#{result.testCase.orderIndex}{result.testCase.isHidden ? ' (ẩn)' : ''}</td>
+          <td><span className={'badge ' + (result.status === 'ACCEPTED' ? 'badge-green' : 'badge-red')}>{result.status}</span>
+            {(result.actualOutput !== null || result.stderr) && <details><summary>StdOut / StdErr · exit {result.exitCode ?? '—'}</summary>
+              <pre style={{ whiteSpace: 'pre-wrap', maxHeight: 250, overflow: 'auto' }}>{result.actualOutput}</pre>
+              {result.stderr && <pre style={{ whiteSpace: 'pre-wrap', maxHeight: 250, overflow: 'auto', color: '#f87171' }}>{result.stderr}</pre>}
+              {result.outputTruncated && <p>Output đã vượt giới hạn.</p>}
+            </details>}</td>
+          <td>{result.executionTimeMs} ms</td><td>{(result.memoryUsedKb / 1024).toFixed(1)} MiB</td><td>{result.scoreEarned}</td>
+        </tr>)}</tbody></table>
+      {!waiting && !submission.testResults?.length && <p>Không có kết quả test case. Xem thông báo compiler / worker ở trên.</p>}
+    </div>
+    <div className="card" style={{ marginTop: '1rem' }}>
+      <h3>AST & Winnowing</h3><p>Trạng thái: {submission.astStatus} · {submission._count?.fingerprints || 0} fingerprint</p>
+      {submission.astVersion && <p>{submission.astVersion} · k = {submission.astK} · w = {submission.astW}</p>}
+      {submission.astMessage && <pre style={{ whiteSpace: 'pre-wrap' }}>{submission.astMessage}</pre>}
+      <p>Giảng viên có thể xem tỷ lệ tương đồng giữa các bài nộp trong trang kết quả của lớp.</p>
+    </div>
+  </div>;
 };

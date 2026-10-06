@@ -7,6 +7,7 @@ Từ thư mục gốc sau khi Docker Desktop sẵn sàng:
 ```powershell
 npm.cmd run db:up
 npm.cmd run db:setup
+npm.cmd run sandbox:build
 npm.cmd start
 ```
 
@@ -71,7 +72,7 @@ Redis dùng AOF và volume `redis_data`, policy `noeviction`. Queue `grading-que
 
 API lưu submission QUEUED vào PostgreSQL trước enqueue. Nếu enqueue lỗi, receipt vẫn được trả với `queuePending=true`; worker đối soát các hàng QUEUED mỗi 10 giây và enqueue lại. Job ID ổn định chống job lặp; bài COMPLETED không chấm lại, kết quả testcase được upsert theo khóa unique. Worker restart được BullMQ xử lý job stalled theo cơ chế queue; không cần giữ process API để tiêu thụ job.
 
-Phần nhận bài hiện vẫn dùng contract JSON `sourceCode` và Sandbox giả lập có sẵn. Thay bằng ZIP intake/Docker Sandbox thật là đầu việc khác trong kế hoạch milestone 2; không dùng điểm mock làm minh chứng an toàn thực thi code.
+Luồng nhận bài hiện dùng multipart ZIP và Docker Sandbox thật. Sau chấm test case, worker chuyển bài sang `plagiarism-queue` để phân tích AST, tạo fingerprint Winnowing và lưu báo cáo tương đồng vào DB. Xem [README](README.md) để cấu hình runner, đóng gói bài nộp và chạy kiểm thử Docker.
 
 Tài liệu BullMQ: https://docs.bullmq.io/guide/connections và https://docs.bullmq.io/guide/going-to-production.
 

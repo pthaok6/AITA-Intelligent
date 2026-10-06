@@ -122,7 +122,6 @@ export const CreateExamPage: React.FC = () => {
               <select className="form-control" value={allowedLanguage} onChange={(e) => setAllowedLanguage(e.target.value)}>
                 <option value="PYTHON">Python 3</option>
                 <option value="JAVA">Java JDK 17</option>
-                <option value="CPP">C++ (GCC)</option>
                 <option value="CSHARP">C# (.NET 8)</option>
               </select>
             </div>

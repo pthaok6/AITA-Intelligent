@@ -22,6 +22,7 @@ var TestCaseStatus;
     TestCaseStatus["TIME_LIMIT_EXCEEDED"] = "TIME_LIMIT_EXCEEDED";
     TestCaseStatus["MEMORY_LIMIT_EXCEEDED"] = "MEMORY_LIMIT_EXCEEDED";
     TestCaseStatus["RUNTIME_ERROR"] = "RUNTIME_ERROR";
+    TestCaseStatus["OUTPUT_LIMIT_EXCEEDED"] = "OUTPUT_LIMIT_EXCEEDED";
 })(TestCaseStatus || (exports.TestCaseStatus = TestCaseStatus = {}));
 var PlagiarismStatus;
 (function (PlagiarismStatus) {

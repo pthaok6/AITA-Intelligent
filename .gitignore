@@ -8,3 +8,5 @@ dist/
 *.db-journal
 *.db-shm
 *.db-wal
+apps/backend/storage/
+apps/backend/storage-test-*/

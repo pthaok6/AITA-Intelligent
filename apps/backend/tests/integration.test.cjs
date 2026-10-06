@@ -10,7 +10,7 @@ process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 process.env.JWT_SECRET = 'integration-test-secret-with-at-least-32-characters';
 process.env.QUEUE_PREFIX = 'aita-test-' + Date.now();
 process.env.FRONTEND_ORIGINS = 'http://localhost:5173';
-delete process.env.GOOGLE_CLIENT_ID;
+process.env.GOOGLE_CLIENT_ID = '';
 const ExcelJS = require('exceljs');
 const jwt = require('jsonwebtoken');
 const { Queue } = require('bullmq');
@@ -21,6 +21,8 @@ const { rosterImportService } = require('../dist/modules/classes/roster-import.s
 const { BullMqJobQueue, defaultJobQueue } = require('../dist/infrastructure/queue/bullmq-job-queue');
 const { SubmissionService } = require('../dist/modules/submissions/submission.service');
 const { AutogradingWorker } = require('../dist/workers/autograding.worker');
+const { AutogradingService } = require('../dist/modules/submissions/autograding.service');
+const { MockSandboxService } = require('../dist/infrastructure/sandbox/mock-sandbox.service');
 const { recoverQueuedSubmissions } = require('../dist/workers/recover-queued');
 const { once } = require('node:events');
 const suffix = Date.now() + '-' + Math.random().toString(16).slice(2);
@@ -124,7 +126,7 @@ test('Milestone 2 integration on PostgreSQL and Redis', async t => {
         assert.ok(config.body.data.nonce);
         const result = await request('/auth/google', { method: 'POST', headers: { Cookie: config.cookies.map(cookie => cookie.split(';')[0]).join('; ') }, body: JSON.stringify({ credential: 'forged.invalid.token' }) });
         assert.equal(result.status, 401);
-      } finally { delete process.env.GOOGLE_CLIENT_ID; }
+      } finally { process.env.GOOGLE_CLIENT_ID = ''; }
     });
     userEmails.push(email('lecturer'), email('outsider'));
     await authService.register(email('lecturer'), password, 'Lecturer');
@@ -208,7 +210,7 @@ test('Milestone 2 integration on PostgreSQL and Redis', async t => {
       assert.equal(await (await queue.getJob(submission.id)).getState(), 'waiting');
     });
     await t.test('worker consumes existing Redis job and persists grading results', async () => {
-      new AutogradingWorker(consumer).init();
+      new AutogradingWorker(consumer, new AutogradingService(undefined, undefined, new MockSandboxService(), producer)).init();
       const completed = await waitFor(async () => { const row = await prisma.submission.findUnique({ where: { id: submission.id }, include: { testResults: true } }); return row.status === 'COMPLETED' ? row : null; });
       assert.equal(completed.testResults.length, 1); assert.equal(completed.totalScore, 10);
     });

@@ -7,6 +7,8 @@ export const ExamSubmissionsPage: React.FC = () => {
   const [exams, setExams] = useState<any[]>([]);
   const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
   const [submissions, setSubmissions] = useState<any[]>([]);
+  const [reports, setReports] = useState<any[]>([]);
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -26,13 +28,18 @@ export const ExamSubmissionsPage: React.FC = () => {
 
   useEffect(() => {
     if (!selectedExamId) return;
+    let active = true;
+    setSubmissions([]); setReports([]);
     const fetchSubmissions = async () => {
-      const res = await apiRequest(`/exams/${selectedExamId}/submissions`);
-      if (res.success && res.data) {
-        setSubmissions(res.data);
-      }
+      const [res, report] = await Promise.all([apiRequest(`/exams/${selectedExamId}/submissions`), apiRequest(`/exams/${selectedExamId}/plagiarism`)]);
+      if (!active) return;
+      if (res.success && res.data) setSubmissions(res.data);
+      if (report.success && report.data) setReports(report.data);
+      setError(!res.success ? res.message || 'Không tải được bài nộp.' : !report.success ? report.message || 'Không tải được báo cáo AST.' : '');
     };
     fetchSubmissions();
+    const timer = setInterval(fetchSubmissions, 5000);
+    return () => { active = false; clearInterval(timer); };
   }, [selectedExamId]);
 
   return (
@@ -42,6 +49,7 @@ export const ExamSubmissionsPage: React.FC = () => {
       </div>
 
       <h2>Danh sách Đề thi & Kết quả Bài nộp</h2>
+      {error && <p role="alert" style={{ color: '#f87171' }}>{error}</p>}
 
       {loading ? (
         <p>Đang tải...</p>
@@ -75,6 +83,7 @@ export const ExamSubmissionsPage: React.FC = () => {
                     <th>Thời điểm nộp</th>
                     <th>Trạng thái</th>
                     <th>Tổng điểm</th>
+                    <th>AST</th>
                     <th>Thao tác</th>
                   </tr>
                 </thead>
@@ -94,6 +103,7 @@ export const ExamSubmissionsPage: React.FC = () => {
                       <td style={{ fontWeight: 600, fontSize: '1.05rem', color: '#34d399' }}>
                         {sub.totalScore} pts
                       </td>
+                      <td>{sub.astStatus}</td>
                       <td>
                         <Link to={`/student/submissions/${sub.id}`} className="btn btn-secondary" style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}>
                           Xem chi tiết
@@ -104,6 +114,18 @@ export const ExamSubmissionsPage: React.FC = () => {
                 </tbody>
               </table>
             )}
+          </div>
+          <div className="card" style={{ marginTop: '1.5rem' }}>
+            <h3>Độ tương đồng AST & Winnowing</h3>
+            <p>Tỷ lệ fingerprint chung trên tập fingerprint nhỏ hơn. Đây là dấu hiệu để giảng viên kiểm tra, không phải kết luận đạo văn.</p>
+            {!reports.length ? <p>Chưa có cặp bài hoàn tất phân tích. Báo cáo tự cập nhật sau khi worker xử lý.</p> : <table className="table">
+              <thead><tr><th>Bài A</th><th>Bài B</th><th>Tương đồng</th><th>Hash chung</th><th>Mức đánh dấu</th></tr></thead>
+              <tbody>{reports.map(report => <tr key={report.id}>
+                <td><Link to={`/student/submissions/${report.submissionAId}`}>{report.submissionA.student.fullName}</Link><div>{report.submissionAId.slice(0, 8)}</div></td>
+                <td><Link to={`/student/submissions/${report.submissionBId}`}>{report.submissionB.student.fullName}</Link><div>{report.submissionBId.slice(0, 8)}</div></td>
+                <td>{report.similarityScore.toFixed(2)}%</td><td>{report.matchedHashesCount}</td><td>{report.status}</td>
+              </tr>)}</tbody>
+            </table>}
           </div>
         </div>
       )}

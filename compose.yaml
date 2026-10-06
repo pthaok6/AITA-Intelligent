@@ -1,4 +1,22 @@
 services:
+  runner-python:
+    profiles: ["runners"]
+    image: aita-runner-python:1
+    build:
+      context: ./docker/sandbox
+      dockerfile: python.Dockerfile
+  runner-csharp:
+    profiles: ["runners"]
+    image: aita-runner-csharp:1
+    build:
+      context: ./docker/sandbox
+      dockerfile: csharp.Dockerfile
+  runner-java:
+    profiles: ["runners"]
+    image: aita-runner-java:1
+    build:
+      context: ./docker/sandbox
+      dockerfile: java.Dockerfile
   redis:
     image: redis:7-alpine
     restart: unless-stopped

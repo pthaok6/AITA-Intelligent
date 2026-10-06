@@ -8,6 +8,13 @@ class ExamService {
         this.examRepo = examRepo;
     }
     async createExam(data) {
+        if (!['PYTHON', 'CSHARP', 'JAVA'].includes(data.allowedLanguage))
+            throw new Error('Chỉ hỗ trợ PYTHON, CSHARP và JAVA.');
+        const time = data.timeLimitMs ?? 2000, memory = data.memoryLimitMb ?? 512;
+        if (!Number.isInteger(time) || time < 1 || time > 10000 || !Number.isInteger(memory) || memory < 64 || memory > 512)
+            throw new Error('Thời gian 1..10000 ms; RAM 64..512 MiB.');
+        if (!Number.isFinite(Date.parse(data.startTime)) || !Number.isFinite(Date.parse(data.endTime)) || Date.parse(data.endTime) <= Date.parse(data.startTime))
+            throw new Error('Thời gian bắt đầu/kết thúc không hợp lệ.');
         return this.examRepo.create({
             ...data,
             startTime: new Date(data.startTime),

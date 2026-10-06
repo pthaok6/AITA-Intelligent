@@ -17,6 +17,8 @@
     "db:logs": "docker compose logs --tail 50 postgres",
     "db:setup": "npm.cmd --prefix apps/backend run prisma:setup",
     "db:studio": "npm.cmd --prefix apps/backend run prisma:studio",
-    "dev:worker": "npm.cmd --prefix apps/backend run dev:worker"
+    "dev:worker": "npm.cmd --prefix apps/backend run dev:worker",
+    "sandbox:build": "docker compose --profile runners build runner-python runner-csharp runner-java",
+    "test:sandbox": "npm.cmd --prefix apps/backend run test:sandbox"
   }
 }

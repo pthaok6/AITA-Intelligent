@@ -7,6 +7,8 @@ export class SubmissionRepository {
     studentId: string;
     sourceCodeUrl: string;
     fileHashSha256: string;
+    artifactType?: string;
+    astStatus?: string;
   }) {
     return prisma.submission.create({
       data: {
@@ -20,6 +22,7 @@ export class SubmissionRepository {
     return prisma.submission.findUnique({
       where: { id },
       include: {
+        _count: { select: { fingerprints: true } },
         exam: { select: { id: true, title: true, allowedLanguage: true, classId: true } },
         student: { select: { id: true, fullName: true, email: true } },
         testResults: {
@@ -69,6 +72,9 @@ export class SubmissionRepository {
       testCaseId: string;
       status: string;
       actualOutput?: string;
+      stderr?: string;
+      exitCode?: number;
+      outputTruncated?: boolean;
       executionTimeMs: number;
       memoryUsedKb: number;
       scoreEarned: number;

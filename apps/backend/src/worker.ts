@@ -4,8 +4,10 @@ import { prisma } from './infrastructure/database/prisma';
 import { defaultJobQueue } from './infrastructure/queue/bullmq-job-queue';
 import { autogradingWorker } from './workers/autograding.worker';
 import { recoverQueuedSubmissions } from './workers/recover-queued';
+import { rblService } from './modules/rbl/rbl.service';
 
 autogradingWorker.init();
+defaultJobQueue.registerHandler('plagiarism-queue', async ({ submissionId }) => rblService.analyze(submissionId));
 let recovering = false;
 async function recover() {
   if (recovering) return;
