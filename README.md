@@ -135,7 +135,19 @@ npm.cmd run dev:worker
 npm.cmd run dev:frontend
 ```
 
-## 6. Google SSO và tài khoản giảng viên
+## 6. Tài khoản thử nghiệm
+
+Dự án hiện **không seed sẵn** tài khoản demo. Tạo ba user local sau qua trang đăng ký; đặt mật khẩu riêng khi đăng ký (tối thiểu 8 ký tự). Các địa chỉ `example.com` dưới đây chỉ dùng làm dữ liệu local, không nhận email.
+
+| Email đăng nhập | Vai trò sau khi tạo | Mục đích |
+| --- | --- | --- |
+| `student.test@example.com` | `STUDENT` (mặc định) | Nộp bài và xem kết quả |
+| `lecturer.test@example.com` | `LECTURER` (cần đổi trong Prisma Studio) | Tạo lớp, import roster, tạo bài kiểm tra |
+| `admin.test@example.com` | `ADMIN` (cần đổi trong Prisma Studio) | Kiểm tra quyền quản trị |
+
+Tạo từng user bằng **Đăng ký** ở web với email trong bảng và mật khẩu do bạn chọn. Sau đó chạy `npm.cmd run db:studio`, mở bảng `User`, đổi `role` của hai user tương ứng thành `LECTURER` và `ADMIN`, rồi đăng xuất/đăng nhập lại để phiên mới nhận vai trò. Không đăng ký lại cùng email; nếu DB đã có các user này thì chỉ cần kiểm tra/chỉnh role. Đây là tài khoản local để thử nghiệm, không dùng các thông tin này trên môi trường triển khai.
+
+## 7. Google SSO và tài khoản giảng viên
 
 Email/mật khẩu vẫn hoạt động khi `GOOGLE_CLIENT_ID` để trống. Để bật Google:
 
@@ -153,7 +165,7 @@ Tự đăng ký chỉ tạo vai trò `STUDENT`. Để có giảng viên khi ch�
 3. Trong bảng `User`, tìm đúng email, đổi `role` thành `LECTURER` rồi lưu. `ADMIN` dành cho người quản trị.
 4. Đăng xuất rồi đăng nhập lại để nhận phiên có vai trò mới.
 
-## 7. Thử luồng đầy đủ trên web
+## 8. Thử luồng đầy đủ trên web
 
 ### Giảng viên
 
@@ -175,7 +187,7 @@ Tài khoản sinh viên do import tạo chưa có mật khẩu mặc định; đ
 
 `COMPLETED` nghĩa là đã chạy hết test; vẫn có thể có test `WRONG_ANSWER`, `RUNTIME_ERROR`, `TIME_LIMIT_EXCEEDED`, `MEMORY_LIMIT_EXCEEDED` hoặc `OUTPUT_LIMIT_EXCEEDED`. Sinh viên không được xem stdout/stderr của test ẩn hay bài nộp người khác.
 
-## 8. Chuẩn bị ZIP
+## 9. Chuẩn bị ZIP
 
 Chỉ các file mã nguồn của ngôn ngữ bài thi được truyền vào container. Không dùng package ngoài; file build do sinh viên gửi (`.csproj`, scripts...) không được thực thi. Extension cần viết thường: `.py`, `.cs`, `.java`.
 
@@ -229,7 +241,7 @@ Compress-Archive -Path examples/submissions/java/* -DestinationPath sum-java.zip
 
 ZIP tối đa **25 MiB**, tổng giải nén tối đa **50 MiB**, tối đa 1000 mục/200 file nguồn; tỷ lệ nén bất thường bị từ chối. ZIP có traversal, đường dẫn tuyệt đối, symlink, mã hóa hoặc tên trùng không được nhận. Dữ liệu được giải nén vào bộ nhớ có giới hạn; không ghi đường dẫn từ ZIP lên filesystem host.
 
-## 9. Sandbox, AST và dữ liệu lưu trữ
+## 10. Sandbox, AST và dữ liệu lưu trữ
 
 ```mermaid
 flowchart LR
@@ -266,7 +278,7 @@ AST có trạng thái riêng `PENDING/RUNNING/COMPLETED/ERROR`; lỗi AST giữ 
 
 Log có thể chứa output test ẩn; chỉ người vận hành đọc thư mục log. API che output test ẩn đối với sinh viên. Storage chưa tự xóa theo lịch; sao lưu cùng DB và quản lý dung lượng theo đợt học. Container được xóa trong `finally`; nếu worker bị kill cưỡng bức, kiểm tra các container có label `aita.sandbox=true` trước khi xử lý container sót.
 
-## 10. API chính
+## 11. API chính
 
 Mọi route dưới đây cần đăng nhập và kiểm tra quyền. Request ghi dữ liệu dùng cookie cần header `X-AITA-Request: 1`; client ngoài trình duyệt có thể dùng Bearer JWT.
 
@@ -281,7 +293,7 @@ Mọi route dưới đây cần đăng nhập và kiểm tra quyền. Request gh
 
 Các bài raw text cũ được migration đánh dấu `LEGACY_TEXT`, AST `SKIPPED`. Điểm cũ được giữ; muốn chấm Docker/AST thì nộp lại bằng ZIP. MockSandbox chỉ dùng khi kiểm thử queue có inject mock rõ ràng, không phải mặc định của worker.
 
-## 11. Chạy kiểm thử
+## 12. Chạy kiểm thử
 
 Unit test không cần chạy Docker:
 
@@ -313,7 +325,7 @@ npm.cmd run test:sandbox
 
 `test:integration` kiểm tra Auth, Google token giả, Excel transaction/rollback, quyền và queue bằng mock được inject rõ ràng. `test:sandbox` cần Docker + ba runner image + DB test + Redis; kiểm tra Python/C#/Java compile/run/AST, AC/WA, lỗi cú pháp, timeout, OOM, output limit, StdOut/StdErr, mạng tắt, UID non-root, rootfs chỉ đọc, container cleanup và luồng ZIP/BullMQ/fingerprint/báo cáo DB thật. Test tạo tài khoản/lớp/storage riêng và dọn các fixture đó.
 
-## 12. Lỗi thường gặp
+## 13. Lỗi thường gặp
 
 | Lỗi/hiện tượng | Cách xử lý |
 | --- | --- |
@@ -329,7 +341,7 @@ npm.cmd run test:sandbox
 | Không thấy lớp/bài tập | Kiểm tra enrollment có đúng email đăng nhập, trạng thái ACTIVE và vai trò. |
 | Đổi password root `.env` nhưng DB không login | PostgreSQL volume đã khởi tạo bằng mật khẩu cũ; dùng mật khẩu hiện tại hoặc thay mật khẩu qua SQL bằng quyền quản trị. Không xóa volume để sửa lỗi kết nối. |
 
-## 13. Build để chạy bằng JavaScript
+## 14. Build để chạy bằng JavaScript
 
 ```powershell
 cd D:\GitHub\swp
@@ -348,7 +360,7 @@ npm.cmd run start:worker
 
 Frontend build nằm ở `apps/frontend/dist`; cấu hình web server phục vụ SPA (fallback về `index.html`) và reverse proxy `/api` tới backend. `npm start` tại root là chế độ phát triển, không tự phục vụ frontend production. API/worker cần cùng DB/Redis/storage; worker cần Docker socket. Trước khi public, cấu hình HTTPS, origins chính xác và secrets riêng. Với mã nguồn không tin cậy ngoài phạm vi lớp học, triển khai worker trên máy/VM riêng và đánh giá cách ly runtime theo mô hình vận hành.
 
-## 14. Mã nguồn và tài liệu
+## 15. Mã nguồn và tài liệu
 
 - `docker/sandbox/`: Dockerfile, trusted compiler và AST parser.
 - `apps/backend/src/infrastructure/sandbox/docker-sandbox.service.ts`: Docker API, giới hạn và thu diagnostics.
