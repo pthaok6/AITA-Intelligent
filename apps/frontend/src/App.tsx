@@ -11,6 +11,10 @@ import { StudentDashboard } from './pages/student/StudentDashboard';
 import { ExamTakePage } from './pages/student/ExamTakePage';
 import { SubmissionResultPage } from './pages/student/SubmissionResultPage';
 import { ImportStudentsPage } from './pages/lecturer/ImportStudentsPage';
+import { AdminUsersPage } from './pages/admin/AdminUsersPage';
+import { EditExamPage } from './pages/lecturer/EditExamPage';
+import { ClassRosterPage } from './pages/lecturer/ClassRosterPage';
+import { MySubmissionsPage } from './pages/student/MySubmissionsPage';
 
 const RootRedirect: React.FC = () => {
   const { isAuthenticated, user, loading } = useAuth();
@@ -43,7 +47,10 @@ export const App: React.FC = () => {
               <Route path="/register" element={<RegisterPage />} />
 
               {/* Lecturer Routes */}
+              <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminUsersPage /></ProtectedRoute>} />
               <Route path="/lecturer/classes/:classId/import-students" element={<ProtectedRoute allowedRoles={['LECTURER', 'ADMIN']}><ImportStudentsPage /></ProtectedRoute>} />
+              <Route path="/lecturer/classes/:classId/exams/:examId/edit" element={<ProtectedRoute allowedRoles={['LECTURER', 'ADMIN']}><EditExamPage /></ProtectedRoute>} />
+              <Route path="/lecturer/classes/:classId/students" element={<ProtectedRoute allowedRoles={['LECTURER', 'ADMIN']}><ClassRosterPage /></ProtectedRoute>} />
               <Route
                 path="/lecturer"
                 element={
@@ -86,6 +93,7 @@ export const App: React.FC = () => {
                   </ProtectedRoute>
                 }
               />
+              <Route path="/student/exams/:examId/submissions" element={<ProtectedRoute allowedRoles={['STUDENT']}><MySubmissionsPage /></ProtectedRoute>} />
               <Route
                 path="/student/submissions/:id"
                 element={

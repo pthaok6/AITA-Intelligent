@@ -38,8 +38,9 @@ submissionRouter.get('/submissions/:id', authenticateJwt, asyncRoute(async (req:
 }));
 submissionRouter.get('/exams/:examId/submissions', authenticateJwt, asyncRoute(async (req: AuthRequest, res) => {
   const exam = await examService.getExamById(String(req.params.examId));
-  await classAccess(exam.classId, req.user!, true);
-  res.json({ success: true, data: (await submissionService.getSubmissionsByExam(exam.id)).map(submission => ({ ...submission, sourceCodeUrl: undefined })) });
+  const studentView = req.user!.role === 'STUDENT';
+  await classAccess(exam.classId, req.user!, !studentView);
+  res.json({ success: true, data: (await submissionService.getSubmissionsByExam(exam.id, studentView ? req.user!.userId : undefined)).map(submission => ({ ...submission, sourceCodeUrl: undefined })) });
 }));
 submissionRouter.get('/exams/:examId/plagiarism', authenticateJwt, asyncRoute(async (req: AuthRequest, res) => {
   const exam = await examService.getExamById(String(req.params.examId));

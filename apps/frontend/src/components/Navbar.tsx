@@ -22,7 +22,7 @@ export const Navbar: React.FC = () => {
           </Link>
           {isAuthenticated && (
             <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>
-              {user?.role === 'LECTURER' ? 'Giảng viên Portal' : 'Sinh viên Portal'}
+              {user?.role === 'ADMIN' ? 'Quản trị Portal' : user?.role === 'LECTURER' ? 'Giảng viên Portal' : 'Sinh viên Portal'}
             </span>
           )}
         </div>
@@ -31,17 +31,18 @@ export const Navbar: React.FC = () => {
           {logoutError && <p role="alert">{logoutError}</p>}
           {isAuthenticated ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              {user?.role === 'ADMIN' && <Link to="/admin/users" className="btn btn-secondary btn-sm">Quản lý tài khoản</Link>}
               <span style={{ fontSize: '0.875rem' }}>
                 {user?.fullName} <span className="badge badge-blue">{user?.role}</span>
               </span>
-              <button onClick={handleLogout} className="btn btn-secondary" style={{ padding: '0.35rem 0.75rem' }}>
+              <button onClick={handleLogout} className="btn btn-secondary btn-sm">
                 Đăng xuất
               </button>
             </div>
           ) : (
             <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <Link to="/login" className="btn btn-secondary">Đăng nhập</Link>
-              <Link to="/register" className="btn btn-primary">Đăng ký</Link>
+              <Link to="/login" className="btn btn-secondary btn-sm">Đăng nhập</Link>
+              <Link to="/register" className="btn btn-primary btn-sm">Đăng ký</Link>
             </div>
           )}
         </div>

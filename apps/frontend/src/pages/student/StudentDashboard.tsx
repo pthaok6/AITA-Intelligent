@@ -1,10 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
+import { useAuth } from '../../contexts/AuthContext';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 
 export const StudentDashboard: React.FC = () => {
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [classCode, setClassCode] = useState('');
+  const [notice, setNotice] = useState('');
+  const [pendingLeave, setPendingLeave] = useState<any>(null);
+  const [leaving, setLeaving] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchClasses = async () => {
@@ -18,12 +25,36 @@ export const StudentDashboard: React.FC = () => {
     fetchClasses();
   }, []);
 
+  const joinClass = async (event: React.FormEvent) => {
+    event.preventDefault(); setNotice('');
+    const result = await apiRequest('/classes/join', { method: 'POST', body: JSON.stringify({ classCode }) });
+    if (!result.success) { setNotice(result.message || 'Không thể tham gia lớp.'); return; }
+    setClassCode(''); setNotice('Đã tham gia lớp.');
+    const refreshed = await apiRequest('/classes'); if (refreshed.success && refreshed.data) setClasses(refreshed.data);
+  };
+
+  const leaveClass = async () => {
+    if (!pendingLeave) return;
+    setLeaving(true);
+    const result = await apiRequest(`/classes/${pendingLeave.id}/enroll`, { method: 'DELETE' });
+    setLeaving(false);
+    setPendingLeave(null);
+    setNotice(result.success ? 'Đã rời lớp.' : result.message || 'Không thể rời lớp.');
+    if (result.success) setClasses(current => current.filter(item => item.id !== pendingLeave.id));
+  };
+
   return (
     <div className="container">
       <div style={{ marginBottom: '1.5rem' }}>
         <h2>Cổng Luyện Tập & Nộp Bài Sinh Viên</h2>
         <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Chọn bài thi thực hành được giao để làm bài và nhận kết quả chấm tự động tức thì</p>
       </div>
+
+      {user?.role === 'STUDENT' && <form onSubmit={joinClass} className="card" style={{ display: 'flex', gap: '0.75rem', alignItems: 'end', marginBottom: '1.5rem' }}>
+        <div className="form-group" style={{ flex: 1, marginBottom: 0 }}><label htmlFor="class-code">Tham gia lớp bằng mã lớp</label><input id="class-code" className="form-control" value={classCode} onChange={event => setClassCode(event.target.value)} required /></div>
+        <button className="btn btn-primary" type="submit">Tham gia</button>
+      </form>}
+      {notice && <p role="status" style={{ marginBottom: '1rem' }}>{notice}</p>}
 
       {loading ? (
         <p>Đang tải danh sách bài tập...</p>
@@ -44,6 +75,7 @@ export const StudentDashboard: React.FC = () => {
                   Giảng viên: <strong>{cls.lecturer?.fullName}</strong>
                 </div>
               </div>
+      {user?.role === 'STUDENT' && <button className="btn btn-ghost-danger btn-sm" onClick={() => setPendingLeave(cls)} style={{ marginBottom: '0.75rem' }}>Rời lớp</button>}
 
               <h4>Danh sách bài thi thực hành:</h4>
               {(!cls.exams || cls.exams.length === 0) ? (
@@ -56,9 +88,10 @@ export const StudentDashboard: React.FC = () => {
                       <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.75rem' }}>
                         Ngôn ngữ: <strong style={{ color: '#60a5fa' }}>{exam.allowedLanguage}</strong> • CPU: {exam.timeLimitMs}ms
                       </p>
-                      <Link to={`/student/exams/${exam.id}/take`} className="btn btn-primary" style={{ width: '100%', fontSize: '0.85rem' }}>
+                      <Link to={`/student/exams/${exam.id}/take`} className="btn btn-primary" style={{ width: '100%' }}>
                         Vào nộp bài &rarr;
                       </Link>
+                      <Link to={`/student/exams/${exam.id}/submissions`} className="btn btn-secondary" style={{ width: '100%', marginTop: '0.5rem' }}>Lịch sử bài nộp</Link>
                     </div>
                   ))}
                 </div>
@@ -67,6 +100,7 @@ export const StudentDashboard: React.FC = () => {
           ))}
         </div>
       )}
+      <ConfirmDialog open={!!pendingLeave} title="Rời lớp học?" description={pendingLeave ? `Bạn sẽ ngừng thấy lớp ${pendingLeave.classCode} và không thể nộp bài mới ở lớp này. Lịch sử bài nộp hiện có vẫn được lưu.` : ''} confirmLabel="Rời lớp" busy={leaving} onConfirm={leaveClass} onCancel={() => setPendingLeave(null)} />
     </div>
   );
 };

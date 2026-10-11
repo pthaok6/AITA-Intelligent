@@ -149,7 +149,7 @@ export const CreateExamPage: React.FC = () => {
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
             <h4>Bộ Test Cases Chấm Điểm Tự Động</h4>
-            <button type="button" onClick={addTestCaseRow} className="btn btn-secondary" style={{ fontSize: '0.8rem' }}>
+            <button type="button" onClick={addTestCaseRow} className="btn btn-secondary">
               + Thêm Test Case
             </button>
           </div>
@@ -159,7 +159,7 @@ export const CreateExamPage: React.FC = () => {
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                 <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Test Case #{idx + 1}</span>
                 {testCases.length > 1 && (
-                  <button type="button" onClick={() => removeTestCaseRow(idx)} style={{ background: 'none', color: '#ef4444', fontSize: '0.8rem' }}>
+                  <button type="button" className="btn btn-ghost-danger btn-sm" onClick={() => removeTestCaseRow(idx)}>
                     Xóa
                   </button>
                 )}

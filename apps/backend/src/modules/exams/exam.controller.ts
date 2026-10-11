@@ -44,6 +44,23 @@ examRouter.post('/', authenticateJwt, requireRoles(UserRole.LECTURER, UserRole.A
   }
 });
 
+examRouter.patch('/:id', authenticateJwt, requireRoles(UserRole.LECTURER, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
+  try {
+    const exam = await examService.getExamById(String(req.params.id));
+    await classAccess(exam.classId, req.user!, true);
+    res.json({ success: true, data: await examService.updateExam(exam.id, req.body) });
+  } catch (error: any) { res.status(error.status || 400).json({ success: false, message: error.message }); }
+});
+
+examRouter.delete('/:id', authenticateJwt, requireRoles(UserRole.LECTURER, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
+  try {
+    const exam = await examService.getExamById(String(req.params.id));
+    await classAccess(exam.classId, req.user!, true);
+    await examService.deleteExam(exam.id);
+    res.json({ success: true, message: 'Đã xóa đề thi.' });
+  } catch (error: any) { res.status(error.status || 400).json({ success: false, message: error.message }); }
+});
+
 // Xem chi tiết đề thi
 examRouter.get('/:id', authenticateJwt, async (req: AuthRequest, res: Response) => {
   try {
@@ -75,4 +92,24 @@ examRouter.post('/:id/testcases', authenticateJwt, requireRoles(UserRole.LECTURE
   } catch (error: any) {
     res.status(error.status || 400).json({ success: false, message: error.message });
   }
+});
+
+examRouter.patch('/:id/testcases/:testCaseId', authenticateJwt, requireRoles(UserRole.LECTURER, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
+  try {
+    const examId = String(req.params.id);
+    const exam = await examService.getExamById(examId);
+    await classAccess(exam.classId, req.user!, true);
+    const { inputData, expectedOutput, isHidden, scoreWeight, orderIndex } = req.body || {};
+    res.json({ success: true, data: await examService.updateTestCase(examId, String(req.params.testCaseId), { inputData, expectedOutput, isHidden, scoreWeight, orderIndex }) });
+  } catch (error: any) { res.status(error.status || 400).json({ success: false, message: error.message }); }
+});
+
+examRouter.delete('/:id/testcases/:testCaseId', authenticateJwt, requireRoles(UserRole.LECTURER, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
+  try {
+    const examId = String(req.params.id);
+    const exam = await examService.getExamById(examId);
+    await classAccess(exam.classId, req.user!, true);
+    await examService.deleteTestCase(examId, String(req.params.testCaseId));
+    res.json({ success: true, message: 'Đã xóa test case.' });
+  } catch (error: any) { res.status(error.status || 400).json({ success: false, message: error.message }); }
 });

@@ -33,9 +33,9 @@ export class SubmissionRepository {
     });
   }
 
-  async findByExamId(examId: string) {
+  async findByExamId(examId: string, studentId?: string) {
     return prisma.submission.findMany({
-      where: { examId },
+      where: { examId, ...(studentId ? { studentId } : {}) },
       include: {
         student: { select: { id: true, fullName: true, email: true } },
         _count: { select: { testResults: true } },

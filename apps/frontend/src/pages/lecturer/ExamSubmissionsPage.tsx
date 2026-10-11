@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 
 export const ExamSubmissionsPage: React.FC = () => {
   const { classId } = useParams<{ classId: string }>();
@@ -10,6 +11,19 @@ export const ExamSubmissionsPage: React.FC = () => {
   const [reports, setReports] = useState<any[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [confirmDeleteExam, setConfirmDeleteExam] = useState(false);
+  const [deletingExam, setDeletingExam] = useState(false);
+  const selectedExam = exams.find(exam => exam.id === selectedExamId);
+
+  const deleteExam = async () => {
+    if (!selectedExam || selectedExam._count?.submissions > 0) return;
+    setDeletingExam(true);
+    const result = await apiRequest(`/exams/${selectedExam.id}`, { method: 'DELETE' });
+    setDeletingExam(false); setConfirmDeleteExam(false);
+    if (!result.success) { setError(result.message || 'Không thể xóa đề thi.'); return; }
+    const remaining = exams.filter(exam => exam.id !== selectedExam.id);
+    setExams(remaining); setSelectedExamId(remaining[0]?.id || null);
+  };
 
   useEffect(() => {
     const fetchExams = async () => {
@@ -71,6 +85,11 @@ export const ExamSubmissionsPage: React.FC = () => {
             ))}
           </div>
 
+          {selectedExam && <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+            <Link className="btn btn-secondary" to={`/lecturer/classes/${classId}/exams/${selectedExam.id}/edit`}>Sửa đề và test case</Link>
+            <button className="btn btn-ghost-danger" disabled={selectedExam._count?.submissions > 0} title="Không thể xóa đề đã có bài nộp" onClick={() => setConfirmDeleteExam(true)}>Xóa đề</button>
+          </div>}
+
           <div className="card">
             <h3>Danh sách bài nộp của sinh viên ({submissions.length})</h3>
             {submissions.length === 0 ? (
@@ -105,7 +124,7 @@ export const ExamSubmissionsPage: React.FC = () => {
                       </td>
                       <td>{sub.astStatus}</td>
                       <td>
-                        <Link to={`/student/submissions/${sub.id}`} className="btn btn-secondary" style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem' }}>
+                        <Link to={`/student/submissions/${sub.id}`} className="btn btn-secondary btn-sm">
                           Xem chi tiết
                         </Link>
                       </td>
@@ -129,6 +148,7 @@ export const ExamSubmissionsPage: React.FC = () => {
           </div>
         </div>
       )}
+      <ConfirmDialog open={confirmDeleteExam} title="Xóa đề thi?" description={selectedExam ? `Xóa đề “${selectedExam.title}” cùng các test case và báo cáo liên quan? Chỉ đề chưa có bài nộp mới được xóa.` : ''} confirmLabel="Xóa đề" busy={deletingExam} onConfirm={deleteExam} onCancel={() => setConfirmDeleteExam(false)} />
     </div>
   );
 };

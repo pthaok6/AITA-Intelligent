@@ -2,7 +2,7 @@
 
 AITA là web quản lý lớp, bài kiểm tra và bài nộp lập trình. Frontend dùng React/Vite; backend dùng Express, Prisma/PostgreSQL, Redis/BullMQ và Docker Engine API.
 
-Hiện đã có đăng nhập JWT/Google, import sinh viên Excel bằng transaction, nộp ZIP, chấm test case bằng Docker thật và phân tích AST/Winnowing. Sinh viên xem điểm, thông báo compiler và StdOut/StdErr của test công khai. Giảng viên xem bài nộp và báo cáo tương đồng. Kết quả được cập nhật bằng polling. LLM review, Tree Edit Distance, WebSocket và khiếu nại điểm chưa được triển khai trong luồng này.
+Hiện đã có đăng nhập JWT/Google, import sinh viên Excel bằng transaction, nộp ZIP, chấm test case bằng Docker thật và phân tích AST/Winnowing. Sinh viên tham gia lớp, nộp bài và xem lịch sử/kết quả. Giảng viên quản lý lớp, roster, đề thi/test case và xem báo cáo tương đồng. ADMIN quản lý tài khoản, vai trò và trạng thái hoạt động. Kết quả được cập nhật bằng polling. LLM review, Tree Edit Distance, WebSocket và khiếu nại điểm chưa được triển khai trong luồng này.
 
 ## 1. Chuẩn bị
 
@@ -135,17 +135,19 @@ npm.cmd run dev:worker
 npm.cmd run dev:frontend
 ```
 
+Trên Windows có thể dùng `start-all.bat` tại thư mục gốc để kiểm tra Docker/config, khởi động PostgreSQL và Redis, chạy `db:setup`, mở Prisma Studio ở cổng 5555 rồi chạy API/worker/frontend. Lần đầu vẫn phải build runner trước bằng `npm.cmd run sandbox:build`. Đóng cửa sổ Prisma Studio riêng; nhấn **Ctrl+C** trong cửa sổ batch để dừng web/API/worker. `npm.cmd start` vẫn là lệnh trực tiếp nếu không cần Prisma Studio.
+
 ## 6. Tài khoản thử nghiệm
 
-Dự án hiện **không seed sẵn** tài khoản demo. Tạo ba user local sau qua trang đăng ký; đặt mật khẩu riêng khi đăng ký (tối thiểu 8 ký tự). Các địa chỉ `example.com` dưới đây chỉ dùng làm dữ liệu local, không nhận email.
+Dự án hiện **không seed sẵn** tài khoản demo. Tạo ba user local sau qua trang đăng ký với mật khẩu được đề xuất trong bảng (tối thiểu 8 ký tự). Email ví dụ dùng miền `fpt.edu.vn` được cấu hình cho phép. Để đăng nhập Google, phải dùng email thật đã được Google xác minh; tài khoản ví dụ có thể không tồn tại.
 
-| Email đăng nhập | Vai trò sau khi tạo | Mục đích |
-| --- | --- | --- |
-| `student.test@example.com` | `STUDENT` (mặc định) | Nộp bài và xem kết quả |
-| `lecturer.test@example.com` | `LECTURER` (cần đổi trong Prisma Studio) | Tạo lớp, import roster, tạo bài kiểm tra |
-| `admin.test@example.com` | `ADMIN` (cần đổi trong Prisma Studio) | Kiểm tra quyền quản trị |
+| Email đăng nhập | Mật khẩu | Vai trò sau khi tạo | Mục đích |
+| --- | --- | --- | --- |
+| `student.test@fpt.edu.vn` | `AitaTest@123` | `STUDENT` (mặc định) | Nộp bài và xem kết quả |
+| `lecturer.test@fpt.edu.vn` | `AitaTest@123` | `LECTURER` (cần đổi trong Prisma Studio) | Tạo lớp, import roster, tạo bài kiểm tra |
+| `admin.test@fpt.edu.vn` | `AitaTest@123` | `ADMIN` (cần đổi trong Prisma Studio) | Kiểm tra quyền quản trị |
 
-Tạo từng user bằng **Đăng ký** ở web với email trong bảng và mật khẩu do bạn chọn. Sau đó chạy `npm.cmd run db:studio`, mở bảng `User`, đổi `role` của hai user tương ứng thành `LECTURER` và `ADMIN`, rồi đăng xuất/đăng nhập lại để phiên mới nhận vai trò. Không đăng ký lại cùng email; nếu DB đã có các user này thì chỉ cần kiểm tra/chỉnh role. Đây là tài khoản local để thử nghiệm, không dùng các thông tin này trên môi trường triển khai.
+Tạo từng user bằng **Đăng ký** ở web với email và mật khẩu trong bảng. Sau đó chạy `npm.cmd run db:studio`, mở bảng `User`, đổi `role` của hai user tương ứng thành `LECTURER` và `ADMIN`, rồi đăng xuất/đăng nhập lại để phiên mới nhận vai trò. Không đăng ký lại cùng email; nếu DB đã có các user này thì chỉ cần kiểm tra/chỉnh role. Đây là tài khoản local để thử nghiệm, không dùng các thông tin này trên môi trường triển khai.
 
 ## 7. Google SSO và tài khoản giảng viên
 
@@ -167,6 +169,16 @@ Tự đăng ký chỉ tạo vai trò `STUDENT`. Để có giảng viên khi ch�
 
 ## 8. Thử luồng đầy đủ trên web
 
+### Quyền và CRUD theo role
+
+| Role | Thao tác trên web |
+| --- | --- |
+| `STUDENT` | Đăng ký tài khoản; tham gia lớp bằng mã lớp; xem lớp, đề thi và lịch sử bài nộp của chính mình; nộp ZIP; xem kết quả; rời lớp. Bài nộp là lịch sử chấm nên không thể sửa/xóa sau khi gửi. |
+| `LECTURER` | Tạo/sửa lớp mình phụ trách; xóa lớp trống; import Excel, xem roster, cho sinh viên rời lớp hoặc ghi danh lại; tạo/sửa đề và test case; xóa đề khi chưa có bài nộp; xem submissions và báo cáo AST/Winnowing. |
+| `ADMIN` | Tạo/xem/sửa tài khoản, đặt mật khẩu mới, đổi role, kích hoạt/vô hiệu hóa; có quyền hỗ trợ xem và quản lý lớp/đề. Vô hiệu hóa là thao tác xóa an toàn: thu hồi phiên đăng nhập và giữ lại bài nộp, enrollment cùng kết quả. |
+
+Để bảo toàn dữ liệu chấm, backend chặn xóa lớp đã có enrollment/đề thi và chặn sửa bộ đề/test sau khi đã có bài nộp. Xóa tài khoản trên màn hình Admin cũng là vô hiệu hóa. Lần đầu cần một tài khoản `ADMIN` được cấp role bởi người có quyền trong Prisma Studio; sau đó Admin có thể tạo các tài khoản role khác ngay trong **Quản lý tài khoản**.
+
 ### Giảng viên
 
 1. Tạo lớp tại dashboard.
@@ -175,15 +187,18 @@ Tự đăng ký chỉ tạo vai trò `STUDENT`. Để có giảng viên khi ch�
 4. Đánh dấu test ẩn nếu cần. Đặt tổng `scoreWeight` theo thang điểm muốn dùng, ví dụ 5 test × 20 = 100.
 5. Vào trang bài nộp/kết quả của lớp. Trang tự tải lại dữ liệu mỗi 5 giây, gồm trạng thái AST và các cặp bài tương đồng.
 
+Trong dashboard giảng viên, **Sửa lớp** cập nhật thông tin; **Danh sách SV** mở roster để rời lớp/ghi danh lại; **Danh sách đề** cho sửa đề và test case. Các nút xóa bị khóa khi lớp/đề đã có dữ liệu phụ thuộc.
+
 Tài khoản sinh viên do import tạo chưa có mật khẩu mặc định; đăng nhập Google bằng đúng email đã import. Muốn thử email/mật khẩu khi chưa có Client ID, cho sinh viên tự đăng ký trước rồi import email đó vào lớp.
 
 ### Sinh viên
 
-1. Đăng nhập bằng email đã được thêm vào lớp.
+1. Đăng nhập bằng email sinh viên rồi nhập mã lớp tại dashboard để tham gia lớp.
 2. Mở bài kiểm tra đang trong thời gian làm bài.
 3. Chọn ZIP chứa mã nguồn, điền entrypoint nếu cần, bấm **Nộp bài và chấm tự động**.
 4. Trang kết quả tự cập nhật: `QUEUED → RUNNING → COMPLETED` hoặc `COMPILE_ERROR / FAILED`.
 5. Xem điểm, StdOut/StdErr của test công khai, thông báo compiler, SHA-256 và số fingerprint. Có thể tải lại ZIP đã nộp.
+6. Mở **Lịch sử bài nộp** ở thẻ đề thi để xem các lần nộp và kết quả cập nhật.
 
 `COMPLETED` nghĩa là đã chạy hết test; vẫn có thể có test `WRONG_ANSWER`, `RUNTIME_ERROR`, `TIME_LIMIT_EXCEEDED`, `MEMORY_LIMIT_EXCEEDED` hoặc `OUTPUT_LIMIT_EXCEEDED`. Sinh viên không được xem stdout/stderr của test ẩn hay bài nộp người khác.
 
@@ -284,11 +299,25 @@ Mọi route dưới đây cần đăng nhập và kiểm tra quyền. Request gh
 
 | Route | Chức năng |
 | --- | --- |
+| `GET /api/classes` | Danh sách lớp theo role: lớp đang học của Student, lớp phụ trách của Lecturer, toàn bộ lớp của Admin |
+| `POST /api/classes` | Lecturer/Admin tạo lớp |
+| `POST /api/classes/join` | Student tham gia lớp với JSON `{ "classCode": "..." }` |
+| `PATCH /api/classes/:id`, `DELETE /api/classes/:id` | Lecturer phụ trách/Admin sửa lớp; chỉ xóa được lớp chưa có enrollment/đề thi |
+| `GET /api/classes/:id` | Đọc chi tiết lớp/roster khi có quyền |
+| `PATCH /api/classes/:id/students/:studentId`, `DELETE /api/classes/:id/students/:studentId` | Lecturer phụ trách/Admin ghi danh lại hoặc chuyển sinh viên sang DROPPED |
+| `GET /api/admin/users`, `POST /api/admin/users` | Admin liệt kê/tạo tài khoản và gán role |
+| `PATCH /api/admin/users/:id`, `DELETE /api/admin/users/:id` | Admin sửa thông tin/role/mật khẩu, kích hoạt hoặc vô hiệu hóa tài khoản |
+| `POST /api/classes/:classId/students/import/preview`, `POST /api/classes/:classId/students/import` | Lecturer/Admin xem trước và import roster Excel |
+| `GET /api/exams/class/:classId` | Lấy danh sách đề theo lớp được phép truy cập |
+| `POST /api/exams` | Lecturer/Admin tạo đề và các test case ban đầu |
+| `GET /api/exams/:id` | Đọc đề; test ẩn chỉ hiện cho Lecturer/Admin có quyền lớp |
+| `PATCH /api/exams/:id`, `DELETE /api/exams/:id` | Lecturer phụ trách/Admin sửa đề hoặc xóa đề chưa có bài nộp |
+| `POST /api/exams/:id/testcases`, `PATCH /api/exams/:id/testcases/:testCaseId`, `DELETE /api/exams/:id/testcases/:testCaseId` | Tạo/sửa/xóa test case trước khi đề có bài nộp; đề phải còn ít nhất một test case |
+| `GET /api/exams/:examId/submissions` | Lecturer/Admin xem lớp; Student chỉ nhận lịch sử bài nộp của chính mình |
 | `POST /api/exams/:examId/submissions` | Multipart `file=<ZIP>`, `entrypoint=<optional>`; JSON `sourceCode` cũ không còn dùng trên HTTP |
 | `GET /api/submissions/:id` | Metadata, điểm, compiler diagnostics, test results và số fingerprint |
 | `GET /api/submissions/:id/archive` | Tải ZIP với kiểm tra chủ bài/giảng viên |
 | `GET /api/submissions/:id/fingerprints` | Tối đa 1000 fingerprint; trả tổng số và hash dạng string |
-| `GET /api/exams/:examId/submissions` | Danh sách bài nộp của giảng viên sở hữu lớp/admin |
 | `GET /api/exams/:examId/plagiarism` | Báo cáo cặp bài; chỉ giảng viên sở hữu lớp/admin |
 
 Các bài raw text cũ được migration đánh dấu `LEGACY_TEXT`, AST `SKIPPED`. Điểm cũ được giữ; muốn chấm Docker/AST thì nộp lại bằng ZIP. MockSandbox chỉ dùng khi kiểm thử queue có inject mock rõ ràng, không phải mặc định của worker.

@@ -8,6 +8,7 @@ import { authRouter } from './modules/auth/auth.controller';
 import { classRouter } from './modules/classes/class.controller';
 import { examRouter } from './modules/exams/exam.controller';
 import { submissionRouter } from './modules/submissions/submission.controller';
+import { adminRouter } from './modules/auth/admin.controller';
 
 export const app = express();
 
@@ -27,6 +28,7 @@ app.use('/api', (req, res, next) => {
 
 // API Routes
 app.use('/api/auth', authRouter);
+app.use('/api/admin', adminRouter);
 app.use('/api/classes', rosterImportRouter);
 app.use('/api/classes', classRouter);
 app.use('/api/exams', examRouter);
