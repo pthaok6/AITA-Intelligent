@@ -63,7 +63,7 @@ class SubmissionService {
             throw new http_1.HttpError(404, 'Không tìm thấy bài nộp.');
         return result;
     }
-    async getSubmissionsByExam(examId) { return this.submissionRepo.findByExamId(examId); }
+    async getSubmissionsByExam(examId, studentId) { return this.submissionRepo.findByExamId(examId, studentId); }
 }
 exports.SubmissionService = SubmissionService;
 exports.submissionService = new SubmissionService();

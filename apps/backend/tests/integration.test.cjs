@@ -22,7 +22,6 @@ const { BullMqJobQueue, defaultJobQueue } = require('../dist/infrastructure/queu
 const { SubmissionService } = require('../dist/modules/submissions/submission.service');
 const { AutogradingWorker } = require('../dist/workers/autograding.worker');
 const { AutogradingService } = require('../dist/modules/submissions/autograding.service');
-const { MockSandboxService } = require('../dist/infrastructure/sandbox/mock-sandbox.service');
 const { recoverQueuedSubmissions } = require('../dist/workers/recover-queued');
 const { once } = require('node:events');
 const suffix = Date.now() + '-' + Math.random().toString(16).slice(2);
@@ -210,7 +209,8 @@ test('Milestone 2 integration on PostgreSQL and Redis', async t => {
       assert.equal(await (await queue.getJob(submission.id)).getState(), 'waiting');
     });
     await t.test('worker consumes existing Redis job and persists grading results', async () => {
-      new AutogradingWorker(consumer, new AutogradingService(undefined, undefined, new MockSandboxService(), producer)).init();
+      const testSandbox = { execute: async (_code, _language, _input, expectedOutput) => ({ status: 'ACCEPTED', actualOutput: expectedOutput, executionTimeMs: 1, memoryUsedKb: 1024 }) };
+      new AutogradingWorker(consumer, new AutogradingService(undefined, undefined, testSandbox, producer)).init();
       const completed = await waitFor(async () => { const row = await prisma.submission.findUnique({ where: { id: submission.id }, include: { testResults: true } }); return row.status === 'COMPLETED' ? row : null; });
       assert.equal(completed.testResults.length, 1); assert.equal(completed.totalScore, 10);
     });

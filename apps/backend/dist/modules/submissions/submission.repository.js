@@ -26,9 +26,9 @@ class SubmissionRepository {
             },
         });
     }
-    async findByExamId(examId) {
+    async findByExamId(examId, studentId) {
         return prisma_1.prisma.submission.findMany({
-            where: { examId },
+            where: { examId, ...(studentId ? { studentId } : {}) },
             include: {
                 student: { select: { id: true, fullName: true, email: true } },
                 _count: { select: { testResults: true } },

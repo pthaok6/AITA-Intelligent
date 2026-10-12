@@ -14,6 +14,7 @@ const auth_controller_1 = require("./modules/auth/auth.controller");
 const class_controller_1 = require("./modules/classes/class.controller");
 const exam_controller_1 = require("./modules/exams/exam.controller");
 const submission_controller_1 = require("./modules/submissions/submission.controller");
+const admin_controller_1 = require("./modules/auth/admin.controller");
 exports.app = (0, express_1.default)();
 exports.app.use((0, cors_1.default)({ credentials: true, origin: (origin, callback) => {
         if (!origin || (0, config_1.allowedOrigins)().includes(origin))
@@ -33,6 +34,7 @@ exports.app.use('/api', (req, res, next) => {
 });
 // API Routes
 exports.app.use('/api/auth', auth_controller_1.authRouter);
+exports.app.use('/api/admin', admin_controller_1.adminRouter);
 exports.app.use('/api/classes', roster_import_controller_1.rosterImportRouter);
 exports.app.use('/api/classes', class_controller_1.classRouter);
 exports.app.use('/api/exams', exam_controller_1.examRouter);
