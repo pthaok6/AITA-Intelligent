@@ -18,7 +18,7 @@ export const Navbar: React.FC = () => {
       <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <Link to="/" style={{ fontWeight: 'bold', fontSize: '1.25rem', color: '#60a5fa', textDecoration: 'none' }}>
-            ⚡ AITA Platform
+             AITA Platform
           </Link>
           {isAuthenticated && (
             <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>
