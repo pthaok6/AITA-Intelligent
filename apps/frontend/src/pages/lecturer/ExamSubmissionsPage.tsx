@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 
+const formatDate = (value: string) => new Date(value).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
 export const ExamSubmissionsPage: React.FC = () => {
   const { classId } = useParams<{ classId: string }>();
   const [exams, setExams] = useState<any[]>([]);
@@ -91,7 +93,7 @@ export const ExamSubmissionsPage: React.FC = () => {
           </div>}
 
           <div className="card">
-            <h3>Danh sách bài nộp của sinh viên ({submissions.length})</h3>
+            <h3>Bài nộp mới nhất của sinh viên ({submissions.length})</h3>
             {submissions.length === 0 ? (
               <p style={{ color: '#94a3b8', marginTop: '1rem' }}>Chưa có sinh viên nào nộp bài cho đề thi này.</p>
             ) : (
@@ -113,7 +115,7 @@ export const ExamSubmissionsPage: React.FC = () => {
                         <strong>{sub.student?.fullName}</strong>
                         <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{sub.student?.email}</div>
                       </td>
-                      <td>{new Date(sub.submittedAt).toLocaleString('vi-VN')}</td>
+                      <td>{formatDate(sub.submittedAt)}</td>
                       <td>
                         <span className={`badge ${sub.status === 'COMPLETED' ? 'badge-green' : sub.status === 'RUNNING' ? 'badge-yellow' : 'badge-blue'}`}>
                           {sub.status}
@@ -136,7 +138,6 @@ export const ExamSubmissionsPage: React.FC = () => {
           </div>
           <div className="card" style={{ marginTop: '1.5rem' }}>
             <h3>Độ tương đồng AST & Winnowing</h3>
-            <p>Tỷ lệ fingerprint chung trên tập fingerprint nhỏ hơn. Đây là dấu hiệu để giảng viên kiểm tra, không phải kết luận đạo văn.</p>
             {!reports.length ? <p>Chưa có cặp bài hoàn tất phân tích. Báo cáo tự cập nhật sau khi worker xử lý.</p> : <table className="table">
               <thead><tr><th>Bài A</th><th>Bài B</th><th>Tương đồng</th><th>Hash chung</th><th>Mức đánh dấu</th></tr></thead>
               <tbody>{reports.map(report => <tr key={report.id}>

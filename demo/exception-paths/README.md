@@ -6,7 +6,7 @@ Các file này chỉ là dữ liệu demo, không chứa dữ liệu cá nhân. 
 
 1. Mở trang lớp với tài khoản giảng viên và chọn Import sinh viên. Cột đã đặt theo header `Email`, `Họ tên`.
 2. `01-excel-invalid-row.xlsx`: preview báo dòng 3 có email không hợp lệ; không có preview token nên không thể commit batch. Dòng hợp lệ trước đó cũng không được ghi.
-3. `02-excel-database-rollback.xlsx`: trước khi demo, cần có tài khoản `lecturer.test@fpt.edu.vn` đã được đăng ký và đổi role thành LECTURER (hoặc thay email trong workbook bằng tài khoản ADMIN/giảng viên hiện có). Preview sẽ hợp lệ. Khi commit, dòng sinh viên mới được xử lý trước; dòng tài khoản giảng viên gây lỗi và transaction phải rollback toàn bộ, không để lại user/enrollment của dòng trước.
+3. `02-excel-ineligible-account.xlsx`: chạy `npm.cmd run seed:demo` để có tài khoản `rollback.probe@fpt.edu.vn` và `lecturer.test@fpt.edu.vn`. Preview đánh dấu sinh viên là sẵn sàng và giảng viên là tài khoản không phải STUDENT; vì vậy commit bị khóa. Lỗi database giữa các lần ghi enrollment vẫn được rollback nguyên batch bởi transaction.
 
 ## Submission ZIP
 

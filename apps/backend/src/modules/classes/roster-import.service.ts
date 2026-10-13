@@ -9,7 +9,7 @@ import { jwtSecret } from '../../config';
 import { HttpError } from '../../shared/http';
 
 export interface ColumnMapping { email: number; fullName: number }
-export interface RosterRow { row: number; email: string; fullName: string }
+export interface RosterRow { row: number; email: string; fullName: string; accountStatus?: 'READY' | 'NOT_FOUND' | 'INACTIVE' | 'NOT_STUDENT' }
 export const MAX_IMPORT_BYTES = 10 * 1024 * 1024 - 1;
 const MAX_ROWS = 5000;
 
@@ -85,10 +85,20 @@ export class RosterImportService {
   async preview(classId: string, actor: { userId: string; role: string }, buffer: Buffer, mapping?: unknown) {
     await this.authorize(classId, actor);
     const parsed = await readRoster(buffer, mapping);
-    const previewToken = !parsed.errors.length && parsed.mapping ? jwt.sign({
+    const users = parsed.rows.length ? await this.db.user.findMany({
+      where: { email: { in: parsed.rows.map(row => row.email) } },
+      select: { email: true, role: true, isActive: true },
+    }) : [];
+    const usersByEmail = new Map(users.map(user => [user.email, user]));
+    const rows = parsed.rows.map(row => {
+      const user = usersByEmail.get(row.email);
+      return { ...row, accountStatus: !user ? 'NOT_FOUND' as const : !user.isActive ? 'INACTIVE' as const : user.role !== 'STUDENT' ? 'NOT_STUDENT' as const : 'READY' as const };
+    });
+    const hasIneligibleAccount = rows.some(row => row.accountStatus === 'INACTIVE' || row.accountStatus === 'NOT_STUDENT');
+    const previewToken = !parsed.errors.length && !hasIneligibleAccount && parsed.mapping ? jwt.sign({
       classId, userId: actor.userId, hash: fileHash(buffer), mapping: parsed.mapping,
     }, jwtSecret(), { algorithm: 'HS256', expiresIn: '15m', issuer: 'aita-import', audience: 'aita-import' }) : null;
-    return { ...parsed, totalRows: parsed.rows.length + parsed.errors.length, previewToken };
+    return { ...parsed, rows, totalRows: parsed.rows.length + parsed.errors.length, previewToken };
   }
   async commit(classId: string, actor: { userId: string; role: string }, buffer: Buffer, mapping: unknown, previewToken: unknown) {
     await this.authorize(classId, actor);
@@ -109,20 +119,17 @@ export class RosterImportService {
         // Recheck ownership inside the same transaction as every user/enrollment write.
         const cls = await tx.class.findUnique({ where: { id: classId } });
         if (!cls || (actor.role !== 'ADMIN' && cls.lecturerId !== actor.userId)) throw new HttpError(403, 'Bạn không có quyền import vào lớp này.');
-        let added = 0, skipped = 0, createdUsers = 0;
+        let added = 0, skipped = 0, missingAccounts = 0;
         for (const row of parsed.rows) {
-          let user = await tx.user.findUnique({ where: { email: row.email } });
-          if (user && (user.role !== 'STUDENT' || !user.isActive)) throw new HttpError(422, 'Import đã được rollback.', [{ row: row.row, message: 'Email thuộc tài khoản bị khóa hoặc không phải sinh viên.' }]);
-          if (!user) {
-            user = await tx.user.create({ data: { email: row.email, fullName: row.fullName, role: 'STUDENT' } });
-            createdUsers++;
-          }
+          const user = await tx.user.findUnique({ where: { email: row.email } });
+          if (!user) { missingAccounts++; continue; }
+          if (user.role !== 'STUDENT' || !user.isActive) throw new HttpError(422, 'Import đã được rollback.', [{ row: row.row, message: 'Email thuộc tài khoản bị khóa hoặc không phải sinh viên.' }]);
           const existing = await tx.classEnrollment.findUnique({ where: { classId_studentId: { classId, studentId: user.id } } });
           if (existing?.status === 'ACTIVE') { skipped++; continue; }
           await tx.classEnrollment.upsert({ where: { classId_studentId: { classId, studentId: user.id } }, create: { classId, studentId: user.id }, update: { status: 'ACTIVE' } });
           added++;
         }
-        return { added, skipped, createdUsers, total: parsed.rows.length, errors: [] };
+        return { added, skipped, missingAccounts, total: parsed.rows.length, errors: [] };
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, maxWait: 10000, timeout: 60000 });
     } catch (error: any) {
       if (error.code === 'P2034' || error.code === 'P2002') throw new HttpError(409, 'Có thay đổi dữ liệu đồng thời; import đã rollback. Vui lòng xem trước và thử lại.');

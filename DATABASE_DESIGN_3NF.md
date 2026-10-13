@@ -156,7 +156,7 @@ Duplicate hash theo BR-07: Individual UNIQUE(examId,fileHashSha256) cho mọi ow
 
 Exactly-one current Group Submission áp dụng khi team đã có ít nhất một submission accepted; trước lần nộp đầu có 0. Accepted submission mới trước deadline thay thế phiên cũ atomically; Late/PENDING không được active/enqueue. Lecturer duyệt late phải ghi reason/actor/time và quyết định thay thế bài hiệu lực trong cùng transaction. SRS chưa định nghĩa thứ tự ưu tiên khi nhiều late submission được duyệt, vì vậy approval phải chọn rõ submission cần làm bài chính thức, không tự lấy timestamp lớn nhất.
 
-Manifest là row/file, thay danh sách JSON sourceFiles hiện tại. ZIP lưu ngoài DB bằng key immutable, kiểm tra SHA-256 trước compile/AST. Runtime logs có bounded stdout/stderr và metadata; không lưu Docker socket/API key trong artifact. File không nguồn có thể ở manifest nhưng chỉ nội dung được trusted runner cho phép mới vào môi trường chạy.
+Manifest là row/file trong `submission_files` với khóa chính `(submissionId, path)`, khóa ngoại tới `submissions`, kích thước byte và ràng buộc kích thước không âm/đường dẫn không rỗng. ZIP lưu ngoài DB bằng key immutable, kiểm tra SHA-256 trước compile/AST. Runtime logs có bounded stdout/stderr và metadata; không lưu Docker socket/API key trong artifact. File không nguồn có thể ở manifest nhưng chỉ nội dung được trusted runner cho phép mới vào môi trường chạy.
 
 EvaluationRun revision mới cho chấm lại; retry kỹ thuật không tạo revision. SandboxResult cùng run/test được upsert idempotent trước completion, khóa sau khi grade được công bố. CHECK/trigger đảm bảo testCase và submission của run thuộc cùng Exam. `scoreEarned`, sandboxScore10 và counts là read projections từ kết quả + test weights, không lưu lặp trong nhiều bảng.
 
@@ -280,7 +280,7 @@ Trạng thái một pipeline là summary; AI/AST/Sandbox failures có dữ liệ
 2. **2NF:** ClassEnrollment và notification preferences phụ thuộc toàn bộ khóa ghép. CriterionScore phụ thuộc (request,criterion). Không chép course/exam attributes xuống từng membership hoặc score row.
 3. **3NF:** User identity chỉ ở users; semester dates chỉ ở semesters; exam metadata chỉ ở exams; repository ở teams; file path ở submission_files. TeamMember không lặp examId/classId; GitContribution không lặp teamId; PersonalScore không lặp studentId; matrix pair scope đi qua analysis/submission.
 4. **Read models:** sandboxScore/AI aggregate/factor/effective score/heatmap là projections. ContributionPct và published grade là versioned aggregate/decision facts cần lưu theo SRS/audit; không quảng cáo các cache/projection vật lý tùy chọn là base relation 3NF. Khi materialize để hiệu năng, ghi rõ source, version và transaction/rebuild policy.
-5. **Controlled redundancy hiện hữu:** Prisma PlagiarismReport có examId + composite FK và Submission có sourceFiles JSON/totalScore. Chúng không tự mất đi vì tài liệu mới; mục 8 phân biệt schema hiện tại với schema đích. Chỉ migrate sau khi có kế hoạch tương thích/backfill.
+5. **Controlled redundancy hiện hữu:** Prisma PlagiarismReport có examId + composite FK và Submission có totalScore là cache điểm Sandbox. Manifest file của submission được chuẩn hóa thành bảng `submission_files`.
 
 Không đưa k-gram/Winnowing, normalize AST hay toàn bộ score computation vào SQL trigger. Trigger dùng cho integrity/concurrency; worker tính toán, DB lưu facts/results và index.
 
@@ -380,7 +380,7 @@ Matrix thực hiện so khớp hash sets ở worker và lưu pair facts; DB join
 
 ## 8. Mapping hiện tại → thiết kế đích
 
-Schema repo hiện có **11 models**; AIReview có bảng nhưng chưa có pipeline semantic/key rotation. Cột thực tế camelCase, IDs TEXT, DateTime TIMESTAMP(3), Float double precision. Table đích mới và CHECK/index minh họa chưa được áp.
+Schema repo hiện có **12 models**; AIReview có bảng nhưng chưa có pipeline semantic/key rotation. Cột thực tế camelCase, IDs TEXT, DateTime TIMESTAMP(3), Float double precision. Table đích mới và CHECK/index minh họa chưa được áp.
 
 | Hiện tại | Đích / việc còn thiếu |
 | --- | --- |
@@ -391,7 +391,7 @@ Schema repo hiện có **11 models**; AIReview có bảng nhưng chưa có pipel
 | Exam | Individual/Group, lifecycle, gradingWeight, team limits; C#/Java baseline/resource policy |
 | TestCase | Giữ input/output/visibility/order/weights; khóa hoặc version config sau mở |
 | Submission | sourceCodeUrl hiện là archive key hoặc legacy raw text; bổ sung submittedBy, owner XOR/team/late/supersession/hash constraints; totalScore chỉ cache Sandbox hiện tại, chưa là Net10 |
-| Submission.sourceFiles Json | Backfill submission_files từ manifest; không coi JSON list là toàn bộ mô hình nguồn 3NF |
+| SubmissionFile | Đã chuẩn hóa manifest vào `submission_files`, mỗi đường dẫn file là một dòng; migration backfill từ `Submission.sourceFiles` |
 | SubmissionTestResult | sandbox_results theo EvaluationRun để giữ regrade; có stdout/stderr/exit/outputTruncated hiện tại; cần same-exam guard |
 | Submission.astStatus/astVersion/astK/astW | Backfill ASTAnalysisRun; giữ parser/normalizer/config version và incomplete state |
 | ASTFingerprint | Hiện submissionId/sourcePath/hash/positions; map sang analysisRunId/submissionFileId; chưa có analysis history |

@@ -28,7 +28,13 @@ export class RblService {
   }
   async compare(submissionId: string) {
     const source = await prisma.submission.findUniqueOrThrow({ where: { id: submissionId }, include: { exam: true, fingerprints: { select: { hashValue: true } } } });
-    const others = await prisma.submission.findMany({ where: { id: { not: submissionId }, examId: source.examId, astStatus: 'COMPLETED', astVersion: source.astVersion, astK: source.astK, astW: source.astW }, include: { fingerprints: { select: { hashValue: true } } } });
+    const attempts = await prisma.submission.findMany({ where: { examId: source.examId }, select: { id: true, studentId: true, attemptNumber: true }, orderBy: { attemptNumber: 'desc' } });
+    const latestByStudent = new Map<string, typeof attempts[number]>();
+    for (const attempt of attempts) if (!latestByStudent.has(attempt.studentId)) latestByStudent.set(attempt.studentId, attempt);
+    const latestSource = latestByStudent.get(source.studentId);
+    if (latestSource?.id !== source.id) return;
+    const otherIds = [...latestByStudent.values()].filter(attempt => attempt.studentId !== source.studentId).map(attempt => attempt.id);
+    const others = await prisma.submission.findMany({ where: { id: { in: otherIds }, astStatus: 'COMPLETED', astVersion: source.astVersion, astK: source.astK, astW: source.astW }, include: { fingerprints: { select: { hashValue: true } } } });
     for (const other of others) {
       const result = similarity(source.fingerprints.map(f => f.hashValue), other.fingerprints.map(f => f.hashValue));
       const [submissionAId, submissionBId] = [source.id, other.id].sort();

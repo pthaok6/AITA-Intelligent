@@ -16,6 +16,7 @@
     "db:stop": "docker compose stop postgres redis",
     "db:logs": "docker compose logs --tail 50 postgres",
     "db:setup": "npm.cmd --prefix apps/backend run prisma:setup",
+    "seed:demo": "npm.cmd --prefix apps/backend run seed:demo",
     "db:studio": "npm.cmd --prefix apps/backend run prisma:studio",
     "dev:worker": "npm.cmd --prefix apps/backend run dev:worker",
     "sandbox:build": "docker compose --profile runners build runner-python runner-csharp runner-java",

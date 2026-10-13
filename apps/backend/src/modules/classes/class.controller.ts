@@ -89,8 +89,8 @@ classRouter.delete('/:id/enroll', authenticateJwt, requireRoles(UserRole.STUDENT
 classRouter.delete('/:id/students/:studentId', authenticateJwt, requireRoles(UserRole.LECTURER, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
     await classAccess(String(req.params.id), req.user!, true);
-    await classService.dropStudent(String(req.params.id), String(req.params.studentId));
-    res.json({ success: true, message: 'Đã chuyển sinh viên sang trạng thái rời lớp.' });
+    await classService.removeStudentFromClass(String(req.params.id), String(req.params.studentId));
+    res.json({ success: true, message: 'Đã xóa sinh viên khỏi lớp.' });
   } catch (error: any) { res.status(error.status || 400).json({ success: false, message: error.message }); }
 });
 

@@ -53,8 +53,8 @@ Tài liệu Google: https://developers.google.com/identity/gsi/web/guides/get-go
 Trong dashboard giảng viên, chọn **Import sinh viên** ở lớp cần nhập.
 
 1. Chọn `.xlsx` nhỏ hơn 10 MB. Sheet đầu tiên, dòng 1 là header; tối đa 5.000 sinh viên/100 cột. Các header mặc định hỗ trợ `Email` và `Họ tên`/`Full Name`.
-2. Nhấn **Xem trước**. Nếu header khác, chọn cột Email/Họ tên rồi xem trước lại. Dòng lỗi và email trùng trong file phải được sửa trước khi xác nhận.
-3. Nhấn **Xác nhận import**. Một SQL transaction ở isolation Serializable ghi tất cả user/enrollment; lỗi validation, role conflict hay DB failure rollback toàn bộ batch.
+2. Nhấn **Xem trước**. Nếu header khác, chọn cột Email/Họ tên rồi xem trước lại. Preview báo tài khoản sẵn sàng, email chưa có tài khoản (sẽ bỏ qua), hoặc tài khoản không hợp lệ. Dòng lỗi và email trùng trong file phải được sửa trước khi xác nhận.
+3. Nhấn **Xác nhận import**. Một SQL transaction ở isolation Serializable ghi enrollment; lỗi validation, role conflict hay DB failure rollback toàn bộ batch. Email chưa có tài khoản được bỏ qua.
 
 API multipart:
 
@@ -62,7 +62,7 @@ API multipart:
 - `POST /api/classes/:classId/students/import`: cùng `file`/`mapping` và `previewToken` từ bước preview. Token gắn với file hash, mapping, lớp và người import, hết hạn sau 15 phút.
 - Cookie client gửi `X-AITA-Request: 1`; Bearer client gửi access token. Chỉ giảng viên sở hữu lớp hoặc ADMIN được import.
 
-Tài khoản mới có vai trò STUDENT và chưa có mật khẩu local, đăng nhập bằng Google với email đã import khi cấu hình Google hoàn tất. Hỗ trợ Gmail cá nhân trong roster. Tài khoản có sẵn giữ nguyên tên/mật khẩu; email không phải STUDENT hoặc tài khoản bị khóa khiến cả batch rollback. Enrollment đã ACTIVE được tính skipped; enrollment DROPPED được kích hoạt lại và tính added. Kết quả có `added`, `skipped`, `createdUsers`, `total`, `errors`.
+Import chỉ ghi danh tài khoản `STUDENT` đang hoạt động đã tồn tại trong database; không tạo user và không đổi mật khẩu. Email chưa có tài khoản được bỏ qua, còn tài khoản bị khóa hoặc không phải STUDENT khiến cả batch rollback. Enrollment đã ACTIVE được tính skipped; enrollment DROPPED được kích hoạt lại và tính added. Kết quả có `added`, `skipped`, `missingAccounts`, `total`, `errors`.
 
 File sai định dạng, công thức/ô lỗi ở cột import và archive vượt giới hạn giải nén được từ chối. Không thực thi công thức Excel.
 

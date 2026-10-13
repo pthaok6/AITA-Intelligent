@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
+import { MarkdownPreview } from '../../components/MarkdownPreview';
 
 export const ExamTakePage: React.FC = () => {
   const { examId } = useParams(); const navigate = useNavigate();
@@ -22,17 +23,17 @@ export const ExamTakePage: React.FC = () => {
     {error && <p role="alert" style={{ color: '#f87171' }}>{error}</p>}
     {exam && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginTop: '1rem' }}>
       <div className="card">
-        <span className="badge badge-blue">{exam.allowedLanguage}</span>
+        <span className="badge badge-blue">{exam.allowedLanguage === 'PYTHON' ? 'Python 3' : exam.allowedLanguage === 'JAVA' ? 'Java 17' : 'C# .NET 8'}</span>
         <h2>{exam.title}</h2><p>{exam.timeLimitMs} ms · {exam.memoryLimitMb} MiB</p>
-        <div style={{ whiteSpace: 'pre-wrap' }}>{exam.descriptionMd}</div>
+        <MarkdownPreview content={exam.descriptionMd} />
         <h3>Test case công khai</h3>
-        {exam.testCases?.map((tc: any) => <div key={tc.id}><p>Input</p><pre>{tc.inputData}</pre><p>Output</p><pre>{tc.expectedOutput}</pre></div>)}
+        {exam.testCases?.map((tc: any, index: number) => <div className="exam-sample-case" key={tc.id}><h4>Test case {index + 1}</h4><p>Dữ liệu đầu vào</p><pre>{tc.inputData}</pre><p>Kết quả mong đợi</p><pre>{tc.expectedOutput}</pre></div>)}
       </div>
       <form className="card" onSubmit={submit}>
-        <h3>Nộp bài bằng ZIP</h3>
+        <h3>Nộp bài dạng ZIP</h3>
         <p>ZIP tối đa 25 MiB, giải nén tối đa 50 MiB. Chỉ mã nguồn được đưa vào môi trường chạy.</p>
         <p>{exam.allowedLanguage === 'PYTHON' ? 'Python: đặt main.py và các module .py vào ZIP. Dùng thư viện chuẩn.' : exam.allowedLanguage === 'JAVA' ? 'Java 17: ZIP chứa Main.java và các file .java. Không dùng thư viện ngoài.' : 'C# .NET 8: ZIP chứa các file .cs có Main hoặc top-level statements. Dự án được biên dịch bằng cấu hình của hệ thống.'}</p>
-        <label htmlFor="submission-zip">File bài nộp</label>
+        <label htmlFor="submission-zip">Tệp bài làm (.zip)</label>
         <input id="submission-zip" className="form-control" type="file" accept=".zip,application/zip" required onChange={e => setFile(e.target.files?.[0] || null)} />
         {exam.allowedLanguage !== 'CSHARP' && <div className="form-group" style={{ marginTop: '1rem' }}>
           <label htmlFor="entrypoint">{exam.allowedLanguage === 'JAVA' ? 'Tên lớp chạy chính (mặc định Main)' : 'File chạy chính trong ZIP (tự tìm main.py)'}</label>

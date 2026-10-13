@@ -5,7 +5,7 @@ import { apiRequest } from '../../api/client';
 interface Preview {
   headers: Array<{ index: number; label: string }>;
   mapping: { email: number; fullName: number } | null;
-  rows: Array<{ row: number; email: string; fullName: string }>;
+  rows: Array<{ row: number; email: string; fullName: string; accountStatus?: 'READY' | 'NOT_FOUND' | 'INACTIVE' | 'NOT_STUDENT' }>;
   errors: Array<{ row: number; message: string }>;
   totalRows: number;
   previewToken: string | null;
@@ -39,11 +39,11 @@ export const ImportStudentsPage: React.FC = () => {
     if (!preview?.previewToken) return;
     const data = formData(); data.append('previewToken', preview.previewToken);
     setBusy(true); setMessage(''); setRowErrors([]);
-    const result = await apiRequest<{ added: number; skipped: number; createdUsers: number }>('/classes/' + classId + '/students/import', { method: 'POST', body: data });
+    const result = await apiRequest<{ added: number; skipped: number; missingAccounts: number }>('/classes/' + classId + '/students/import', { method: 'POST', body: data });
     setBusy(false);
     // Always require another preview after an attempted commit.
     setPreview(current => current ? { ...current, previewToken: null } : null);
-    if (result.success && result.data) setMessage('Import thành công: ' + result.data.added + ' sinh viên được thêm, ' + result.data.skipped + ' đã có trong lớp, ' + result.data.createdUsers + ' tài khoản mới.');
+    if (result.success && result.data) setMessage('Import thành công: ' + result.data.added + ' sinh viên được thêm, ' + result.data.skipped + ' đã có trong lớp, ' + result.data.missingAccounts + ' email chưa có tài khoản nên được bỏ qua.');
     else {
       setMessage(result.message || 'Import không thành công; dữ liệu không được ghi một phần.');
       if (Array.isArray(result.details)) setRowErrors(result.details as any);
@@ -61,7 +61,7 @@ export const ImportStudentsPage: React.FC = () => {
     <div className="card" style={{ marginTop: '1rem' }}>
       <h2>Import sinh viên từ Excel</h2>
       <p>Sheet đầu tiên cần có dòng tiêu đề và các cột Email, Họ tên. Tối đa 5.000 sinh viên, file nhỏ hơn 10 MB.</p>
-      <p>Tài khoản mới đăng nhập bằng Google với email đã import, gồm Gmail cá nhân. Sinh viên đã có tài khoản được giữ nguyên thông tin.</p>
+      <p>Chỉ ghi danh tài khoản sinh viên đang hoạt động đã có trong hệ thống. Email chưa có tài khoản sẽ được bỏ qua; import không tự tạo tài khoản.</p>
       <input type="file" accept=".xlsx" disabled={busy} onChange={event => selectFile(event.target.files?.[0] || null)} />
       <button className="btn btn-secondary" disabled={!file || busy} onClick={showPreview} style={{ marginLeft: '1rem' }}>{busy ? 'Đang xử lý...' : 'Xem trước'}</button>
       {preview && <div style={{ marginTop: '1rem' }}>
@@ -78,10 +78,11 @@ export const ImportStudentsPage: React.FC = () => {
           </label>)}
         </div>
         <p>{preview.totalRows} dòng; hiển thị tối đa 100 dòng mẫu. Khi đổi cột, nhấn Xem trước lại.</p>
+        {preview.rows.some(row => row.accountStatus === 'INACTIVE' || row.accountStatus === 'NOT_STUDENT') && <p role="alert">Tài khoản bị khóa hoặc không phải sinh viên cần được sửa trước khi import.</p>}
         <div style={{ overflowX: 'auto', maxHeight: '360px' }}>
           <table style={{ width: '100%', textAlign: 'left' }}>
-            <thead><tr><th>Dòng</th><th>Email</th><th>Họ tên</th></tr></thead>
-            <tbody>{preview.rows.slice(0, 100).map(row => <tr key={row.row}><td>{row.row}</td><td>{row.email}</td><td>{row.fullName}</td></tr>)}</tbody>
+            <thead><tr><th>Dòng</th><th>Email</th><th>Họ tên</th><th>Tài khoản</th></tr></thead>
+            <tbody>{preview.rows.slice(0, 100).map(row => <tr key={row.row}><td>{row.row}</td><td>{row.email}</td><td>{row.fullName}</td><td>{row.accountStatus === 'READY' ? 'Sẵn sàng import' : row.accountStatus === 'NOT_FOUND' ? 'Không có tài khoản — sẽ bỏ qua' : row.accountStatus === 'INACTIVE' ? 'Tài khoản đã khóa' : row.accountStatus === 'NOT_STUDENT' ? 'Không phải tài khoản sinh viên' : 'Chưa kiểm tra'}</td></tr>)}</tbody>
           </table>
         </div>
         <button className="btn btn-primary" disabled={busy || !preview.previewToken || !!rowErrors.length} onClick={commit} style={{ marginTop: '1rem' }}>Xác nhận import</button>

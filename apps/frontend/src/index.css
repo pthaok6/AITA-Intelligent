@@ -345,3 +345,51 @@ dialog.confirm-dialog::backdrop {
 .table tr:hover td {
   background: rgba(255, 255, 255, 0.02);
 }
+
+/* Markdown đề bài và phần xem trước */
+.markdown-editor-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  align-items: stretch;
+}
+.markdown-panel-title {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.markdown-editor { min-height: 17rem; resize: vertical; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; line-height: 1.55; }
+.markdown-preview {
+  min-height: 17rem;
+  padding: 1rem 1.15rem;
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  background: #0d1522;
+  border: 1px solid var(--border);
+  border-radius: 0.65rem;
+  line-height: 1.7;
+}
+.markdown-preview > :first-child { margin-top: 0; }
+.markdown-preview > :last-child { margin-bottom: 0; }
+.markdown-preview h1, .markdown-preview h2, .markdown-preview h3,
+.markdown-preview h4, .markdown-preview h5, .markdown-preview h6 { margin: 1.1em 0 0.45em; line-height: 1.3; }
+.markdown-preview h1 { font-size: 1.55rem; }
+.markdown-preview h2 { font-size: 1.3rem; }
+.markdown-preview h3 { font-size: 1.1rem; }
+.markdown-preview p, .markdown-preview ul, .markdown-preview ol, .markdown-preview blockquote { margin: 0.65em 0; }
+.markdown-preview ul, .markdown-preview ol { padding-left: 1.5rem; }
+.markdown-preview blockquote { padding: 0.2rem 0.85rem; color: var(--text-secondary); border-left: 3px solid var(--primary); }
+.markdown-preview code { padding: 0.12em 0.35em; color: #bfdbfe; background: #18283e; border-radius: 0.3rem; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.markdown-preview pre { padding: 0.85rem 1rem; overflow-x: auto; color: #dbeafe; background: #080d15; border: 1px solid #26364b; border-radius: 0.55rem; }
+.markdown-preview pre code { padding: 0; color: inherit; background: transparent; }
+.markdown-preview a { color: #93c5fd; text-decoration: underline; }
+.markdown-preview-empty { color: var(--text-secondary); font-style: italic; }
+.exam-sample-case { margin: 0.9rem 0; padding: 0.8rem 1rem; background: #0d1522; border: 1px solid var(--border); border-radius: 0.6rem; }
+.exam-sample-case h4 { margin: 0 0 0.65rem; }
+.exam-sample-case p { margin: 0.5rem 0 0.25rem; color: var(--text-secondary); font-size: 0.85rem; }
+.exam-sample-case pre { margin: 0; padding: 0.65rem 0.8rem; overflow-x: auto; background: #080d15; border-radius: 0.4rem; }
+@media (max-width: 760px) { .markdown-editor-preview { grid-template-columns: minmax(0, 1fr); } .markdown-editor, .markdown-preview { min-height: 12rem; } }

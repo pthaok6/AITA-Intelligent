@@ -15,7 +15,7 @@ export class SubmissionService {
     const enrollment = await prisma.classEnrollment.findUnique({ where: { classId_studentId: { classId: exam.classId, studentId } } });
     const student = await prisma.user.findUnique({ where: { id: studentId } });
     if (!enrollment || enrollment.status !== 'ACTIVE' || student?.role !== 'STUDENT') throw new HttpError(403, 'Chỉ sinh viên đang học trong lớp được nộp bài.');
-    if (new Date() < exam.startTime || new Date() > exam.endTime) throw new HttpError(400, 'Bài thi chưa bắt đầu hoặc đã kết thúc.');
+    if (new Date() < exam.startTime || new Date() >= exam.endTime) throw new HttpError(400, 'Bài thi chưa bắt đầu hoặc đã kết thúc.');
     return exam;
   }
   private async enqueue(submission: any) {
@@ -28,7 +28,11 @@ export class SubmissionService {
     const exam = await this.authorizeSubmission(examId, studentId);
     const bundle = selectBundle(await readZip(bytes), exam.allowedLanguage, entrypoint);
     const stored = await persistArchive(bytes);
-    const submission = await prisma.submission.create({ data: { examId, studentId, sourceCodeUrl: stored.key, fileHashSha256: stored.hash, artifactType: 'ZIP', originalFilename: filename.slice(0, 200), entrypoint: bundle.entrypoint, sourceFiles: bundle.files.map(f => ({ path: f.path, size: f.data.length })) } });
+    const submission = await this.submissionRepo.create({
+      examId, studentId, sourceCodeUrl: stored.key, fileHashSha256: stored.hash,
+      artifactType: 'ZIP', originalFilename: filename.slice(0, 200), entrypoint: bundle.entrypoint,
+      sourceFiles: bundle.files.map(file => ({ path: file.path, size: file.data.length })),
+    });
     return this.enqueue(submission);
   }
   // Compatibility for explicit mock tests only. The HTTP API accepts ZIP exclusively.
@@ -41,6 +45,9 @@ export class SubmissionService {
     const result = await this.submissionRepo.findById(id);
     if (!result) throw new HttpError(404, 'Không tìm thấy bài nộp.');
     return result;
+  }
+  async getLatestSubmissionId(examId: string, studentId: string) {
+    return (await this.submissionRepo.findLatestForStudent(examId, studentId))?.id;
   }
   async getSubmissionsByExam(examId: string, studentId?: string) { return this.submissionRepo.findByExamId(examId, studentId); }
 }

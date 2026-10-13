@@ -137,6 +137,7 @@ test('Milestone 2 integration on PostgreSQL and Redis', async t => {
     const lecturerSession = await authService.login(lecturer.email, password);
     const headers = { Authorization: 'Bearer ' + lecturerSession.token };
     const rosterEmails = [email('import1'), email('import2')]; userEmails.push(...rosterEmails);
+    const existingStudent = await prisma.user.create({ data: { email: rosterEmails[0], fullName: 'First', role: 'STUDENT' } });
     const file = await workbook([[rosterEmails[0], 'First'], [rosterEmails[1], 'Second']]);
     let preview;
     await t.test('preview is read-only and returns signed mapping receipt', async () => {
@@ -144,8 +145,10 @@ test('Milestone 2 integration on PostgreSQL and Redis', async t => {
       const result = await request('/classes/' + cls.id + '/students/import/preview', { method: 'POST', headers, body: data });
       assert.equal(result.status, 200); assert.equal(result.body.data.rows.length, 2);
       assert.ok(result.body.data.previewToken);
-      assert.equal(await prisma.user.count({ where: { email: { in: rosterEmails } } }), 0);
+      assert.equal(await prisma.user.count({ where: { email: { in: rosterEmails } } }), 1);
       preview = result.body.data;
+      assert.equal(preview.rows[0].accountStatus, 'READY');
+      assert.equal(preview.rows[1].accountStatus, 'NOT_FOUND');
     });
     await t.test('student and another lecturer cannot import into class', async () => {
       for (const identity of [student, outsider]) {
@@ -159,32 +162,39 @@ test('Milestone 2 integration on PostgreSQL and Redis', async t => {
       const altered = await workbook([[email('changed'), 'Changed']]);
       await assert.rejects(rosterImportService.commit(cls.id, actor, altered, preview.mapping, preview.previewToken), { status: 409 });
     });
-    await t.test('commit imports both users/enrollments and rerun skips duplicates', async () => {
+    await t.test('commit enrolls only existing accounts and skips missing accounts and duplicate enrollments', async () => {
       const data = new FormData(); data.append('file', new Blob([file]), 'students.xlsx'); data.append('mapping', JSON.stringify(preview.mapping)); data.append('previewToken', preview.previewToken);
       const result = await request('/classes/' + cls.id + '/students/import', { method: 'POST', headers, body: data });
-      assert.equal(result.status, 200); assert.equal(result.body.data.added, 2); assert.equal(result.body.data.createdUsers, 2);
+      assert.equal(result.status, 200); assert.equal(result.body.data.added, 1); assert.equal(result.body.data.skipped, 0); assert.equal(result.body.data.missingAccounts, 1);
+      assert.equal(await prisma.classEnrollment.count({ where: { classId: cls.id, studentId: existingStudent.id } }), 1);
+      assert.equal(await prisma.user.count({ where: { email: rosterEmails[1] } }), 0);
       const repeated = await rosterImportService.commit(cls.id, actor, file, preview.mapping, preview.previewToken);
-      assert.equal(repeated.added, 0); assert.equal(repeated.skipped, 2);
+      assert.equal(repeated.added, 0); assert.equal(repeated.skipped, 1); assert.equal(repeated.missingAccounts, 1);
     });
-    await t.test('role conflict after first row rolls back users and enrollments', async () => {
+    await t.test('preview blocks a non-student account before enrollment changes', async () => {
       const newEmail = email('rollback-role'); userEmails.push(newEmail);
-      const bytes = await workbook([[newEmail, 'New'], [lecturer.email, 'Conflicting lecturer']]);
+      const firstStudent = await prisma.user.create({ data: { email: newEmail, fullName: 'New student', role: 'STUDENT' } });
+      const bytes = await workbook([[newEmail, 'New student'], [lecturer.email, 'Conflicting lecturer']]);
       const data = await rosterImportService.preview(cls.id, actor, bytes);
-      await assert.rejects(rosterImportService.commit(cls.id, actor, bytes, data.mapping, data.previewToken), { status: 422 });
-      assert.equal(await prisma.user.count({ where: { email: newEmail } }), 0);
+      assert.equal(data.rows[1].accountStatus, 'NOT_STUDENT');
+      assert.equal(data.previewToken, null);
+      await assert.rejects(rosterImportService.commit(cls.id, actor, bytes, data.mapping, data.previewToken), { status: 409 });
+      assert.equal(await prisma.classEnrollment.count({ where: { classId: cls.id, studentId: firstStudent.id } }), 0);
     });
     await t.test('database error after a successful first insert rolls back entire batch', async () => {
       const first = email('rollback-db'); const fail = email('trigger-fail'); userEmails.push(first, fail);
-      await prisma.$executeRawUnsafe("CREATE FUNCTION aita_test_fail_insert() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.email LIKE 'trigger-fail-%' THEN RAISE EXCEPTION 'test database failure'; END IF; RETURN NEW; END $$");
-      await prisma.$executeRawUnsafe('CREATE TRIGGER aita_test_failure BEFORE INSERT ON users FOR EACH ROW EXECUTE FUNCTION aita_test_fail_insert()');
+      const firstStudent = await prisma.user.create({ data: { email: first, fullName: 'First', role: 'STUDENT' } });
+      const failingStudent = await prisma.user.create({ data: { email: fail, fullName: 'Failure', role: 'STUDENT' } });
+      await prisma.$executeRawUnsafe(`CREATE FUNCTION aita_test_fail_enrollment() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW."studentId" = '${failingStudent.id}' THEN RAISE EXCEPTION 'test database failure'; END IF; RETURN NEW; END $$`);
+      await prisma.$executeRawUnsafe('CREATE TRIGGER aita_test_failure BEFORE INSERT ON class_enrollments FOR EACH ROW EXECUTE FUNCTION aita_test_fail_enrollment()');
       try {
         const bytes = await workbook([[first, 'First'], [fail, 'Failure']]);
         const data = await rosterImportService.preview(cls.id, actor, bytes);
         await assert.rejects(rosterImportService.commit(cls.id, actor, bytes, data.mapping, data.previewToken));
-        assert.equal(await prisma.user.count({ where: { email: { in: [first, fail] } } }), 0);
+        assert.equal(await prisma.classEnrollment.count({ where: { classId: cls.id, studentId: { in: [firstStudent.id, failingStudent.id] } } }), 0);
       } finally {
-        await prisma.$executeRawUnsafe('DROP TRIGGER aita_test_failure ON users');
-        await prisma.$executeRawUnsafe('DROP FUNCTION aita_test_fail_insert()');
+        await prisma.$executeRawUnsafe('DROP TRIGGER aita_test_failure ON class_enrollments');
+        await prisma.$executeRawUnsafe('DROP FUNCTION aita_test_fail_enrollment()');
       }
     });
     await t.test('invalid row produces errors and no partial import', async () => {

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { MarkdownPreview } from '../../components/MarkdownPreview';
 
 type TestCase = { id?: string; inputData: string; expectedOutput: string; isHidden: boolean; scoreWeight: number; orderIndex: number };
 type ExamForm = { title: string; descriptionMd: string; allowedLanguage: string; timeLimitMs: number; memoryLimitMb: number; startTime: string; endTime: string };
@@ -63,24 +64,27 @@ export const EditExamPage: React.FC = () => {
       {error && <p role="alert" style={{ color: '#f87171' }}>{error}</p>}
       {form && <form onSubmit={save}>
         <div className="form-group"><label>Tiêu đề</label><input className="form-control" required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} /></div>
-        <div className="form-group"><label>Mô tả (Markdown)</label><textarea className="form-control" rows={4} required value={form.descriptionMd} onChange={e => setForm({ ...form, descriptionMd: e.target.value })} /></div>
+        <div className="form-group"><label htmlFor="exam-description">Mô tả đề bài (Markdown)</label><div className="markdown-editor-preview">
+          <div><span className="markdown-panel-title">Nội dung Markdown</span><textarea id="exam-description" className="form-control markdown-editor" rows={12} required value={form.descriptionMd} onChange={e => setForm({ ...form, descriptionMd: e.target.value })} /></div>
+          <section aria-label="Xem trước đề bài"><span className="markdown-panel-title">Xem trước</span><MarkdownPreview content={form.descriptionMd} /></section>
+        </div></div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.75rem' }}>
           <div className="form-group"><label>Ngôn ngữ</label><select className="form-control" value={form.allowedLanguage} onChange={e => setForm({ ...form, allowedLanguage: e.target.value })}><option value="PYTHON">Python</option><option value="CSHARP">C#</option><option value="JAVA">Java</option></select></div>
-          <div className="form-group"><label>Giới hạn CPU (ms)</label><input className="form-control" type="number" value={form.timeLimitMs} onChange={e => setForm({ ...form, timeLimitMs: Number(e.target.value) })} /></div>
-          <div className="form-group"><label>Giới hạn RAM (MiB)</label><input className="form-control" type="number" value={form.memoryLimitMb} onChange={e => setForm({ ...form, memoryLimitMb: Number(e.target.value) })} /></div>
+          <div className="form-group"><label>Thời gian chạy tối đa (ms)</label><input className="form-control" type="number" value={form.timeLimitMs} onChange={e => setForm({ ...form, timeLimitMs: Number(e.target.value) })} /></div>
+          <div className="form-group"><label>Bộ nhớ tối đa (MiB)</label><input className="form-control" type="number" value={form.memoryLimitMb} onChange={e => setForm({ ...form, memoryLimitMb: Number(e.target.value) })} /></div>
           <div className="form-group"><label>Bắt đầu</label><input className="form-control" type="datetime-local" value={form.startTime} onChange={e => setForm({ ...form, startTime: e.target.value })} /></div>
           <div className="form-group"><label>Kết thúc</label><input className="form-control" type="datetime-local" value={form.endTime} onChange={e => setForm({ ...form, endTime: e.target.value })} /></div>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '1rem 0' }}><h3>Test cases</h3><button type="button" className="btn btn-secondary" onClick={() => setCases([...cases, { inputData: '', expectedOutput: '', isHidden: false, scoreWeight: 1, orderIndex: Math.max(0, ...cases.map(item => item.orderIndex)) + 1 }])}>+ Thêm test</button></div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '1rem 0' }}><h3>Test case</h3><button type="button" className="btn btn-secondary" onClick={() => setCases([...cases, { inputData: '', expectedOutput: '', isHidden: false, scoreWeight: 1, orderIndex: Math.max(0, ...cases.map(item => item.orderIndex)) + 1 }])}>+ Thêm test case</button></div>
         {cases.map((item, index) => <div className="card" key={item.id || `new-${index}`} style={{ marginBottom: '0.75rem' }}>
-          <div className="form-group"><label>Input</label><textarea className="form-control" value={item.inputData} onChange={e => updateCase(index, 'inputData', e.target.value)} /></div>
-          <div className="form-group"><label>Expected output</label><textarea className="form-control" value={item.expectedOutput} onChange={e => updateCase(index, 'expectedOutput', e.target.value)} /></div>
+          <div className="form-group"><label>Dữ liệu đầu vào</label><textarea className="form-control" value={item.inputData} onChange={e => updateCase(index, 'inputData', e.target.value)} /></div>
+          <div className="form-group"><label>Kết quả mong đợi</label><textarea className="form-control" value={item.expectedOutput} onChange={e => updateCase(index, 'expectedOutput', e.target.value)} /></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}><label><input type="checkbox" checked={item.isHidden} onChange={e => updateCase(index, 'isHidden', e.target.checked)} /> Test ẩn</label><label>Trọng số <input type="number" min="0.1" step="0.1" value={item.scoreWeight} onChange={e => updateCase(index, 'scoreWeight', Number(e.target.value))} /></label><button type="button" className="btn btn-ghost-danger btn-sm" onClick={() => setPendingDeleteCase(item)}>Xóa test</button></div>
         </div>)}
         {cases.length === 0 && <p>Cần thêm ít nhất một test case trước khi lưu.</p>}
         <button className="btn btn-primary" disabled={saving || cases.length === 0}>{saving ? 'Đang lưu…' : 'Lưu thay đổi'}</button>
       </form>}
     </div>
-    <ConfirmDialog open={!!pendingDeleteCase} title="Xóa test case?" description="Test case này sẽ bị xóa khỏi đề. Đề phải còn ít nhất một test case, và chỉ có thể chỉnh bộ test trước khi nhận bài nộp." confirmLabel="Xóa test" busy={deletingCase} onConfirm={removeCase} onCancel={() => setPendingDeleteCase(null)} />
+    <ConfirmDialog open={!!pendingDeleteCase} title="Xóa test case?" description="Test case này sẽ bị xóa khỏi đề. Đề phải còn ít nhất một test case, và chỉ có thể chỉnh sửa bộ test trước khi nhận bài nộp." confirmLabel="Xóa test case" busy={deletingCase} onConfirm={removeCase} onCancel={() => setPendingDeleteCase(null)} />
   </div>;
 };

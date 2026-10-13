@@ -139,15 +139,16 @@ Trên Windows có thể dùng `start-all.bat` tại thư mục gốc để kiể
 
 ## 6. Tài khoản thử nghiệm
 
-Dự án hiện **không seed sẵn** tài khoản demo. Tạo ba user local sau qua trang đăng ký với mật khẩu được đề xuất trong bảng (tối thiểu 8 ký tự). Email ví dụ dùng miền `fpt.edu.vn` được cấu hình cho phép. Để đăng nhập Google, phải dùng email thật đã được Google xác minh; tài khoản ví dụ có thể không tồn tại.
+Dự án có lệnh seed tài khoản demo local: `npm.cmd run seed:demo`. Các tài khoản trong file roster mẫu gồm 5 sinh viên đã được seed để đăng nhập bằng mật khẩu demo; 5 email còn lại chưa tồn tại và sẽ bị bỏ qua khi import. Mọi tài khoản dùng mật khẩu `AitaTest@123`. Chỉ dùng trong môi trường local/test.
 
-| Email đăng nhập | Mật khẩu | Vai trò sau khi tạo | Mục đích |
+| Email đăng nhập | Mật khẩu | Vai trò được seed | Mục đích |
 | --- | --- | --- | --- |
-| `student.test@fpt.edu.vn` | `AitaTest@123` | `STUDENT` (mặc định) | Nộp bài và xem kết quả |
-| `lecturer.test@fpt.edu.vn` | `AitaTest@123` | `LECTURER` (cần đổi trong Prisma Studio) | Tạo lớp, import roster, tạo bài kiểm tra |
-| `admin.test@fpt.edu.vn` | `AitaTest@123` | `ADMIN` (cần đổi trong Prisma Studio) | Kiểm tra quyền quản trị |
+| `student.test@fpt.edu.vn` | `AitaTest@123` | `STUDENT` | Nộp bài và xem kết quả |
+| `student.test02@fpt.edu.vn` – `student.test05@fpt.edu.vn` | `AitaTest@123` | `STUDENT` | Tài khoản sẵn có trong file import demo |
+| `lecturer.test@fpt.edu.vn` | `AitaTest@123` | `LECTURER` | Tạo lớp, import roster, tạo bài kiểm tra |
+| `admin.test@fpt.edu.vn` | `AitaTest@123` | `ADMIN` | Kiểm tra quyền quản trị |
 
-Tạo từng user bằng **Đăng ký** ở web với email và mật khẩu trong bảng. Sau đó chạy `npm.cmd run db:studio`, mở bảng `User`, đổi `role` của hai user tương ứng thành `LECTURER` và `ADMIN`, rồi đăng xuất/đăng nhập lại để phiên mới nhận vai trò. Không đăng ký lại cùng email; nếu DB đã có các user này thì chỉ cần kiểm tra/chỉnh role. Đây là tài khoản local để thử nghiệm, không dùng các thông tin này trên môi trường triển khai.
+Chạy `npm.cmd run seed:demo` để tạo/cập nhật các tài khoản và lớp demo. Sau đó chạy `npm.cmd run db:studio` để kiểm tra dữ liệu. Đây là tài khoản local để thử nghiệm, không dùng các thông tin này trên môi trường triển khai.
 
 ## 7. Google SSO và tài khoản giảng viên
 
@@ -160,7 +161,7 @@ Email/mật khẩu vẫn hoạt động khi `GOOGLE_CLIENT_ID` để trống. Đ
 
 Backend xác minh ID token và email; `gmail.com` được chấp nhận theo việc sinh viên K19 sử dụng email cá nhân. Quyền học trong lớp vẫn được kiểm tra bằng enrollment. Xem [hướng dẫn Google chính thức](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid) và [chi tiết Auth/import](MILESTONE_2_AUTH_IMPORT_QUEUE.md).
 
-Tự đăng ký chỉ tạo vai trò `STUDENT`. Để có giảng viên khi chạy local:
+Tự đăng ký chỉ tạo vai trò `STUDENT`. Nếu không dùng seed demo, có thể tạo giảng viên local theo các bước sau:
 
 1. Đăng ký tài khoản trên web.
 2. Mở terminal khác, chạy `npm.cmd run db:studio`.
@@ -173,7 +174,7 @@ Tự đăng ký chỉ tạo vai trò `STUDENT`. Để có giảng viên khi ch�
 
 | Role | Thao tác trên web |
 | --- | --- |
-| `STUDENT` | Đăng ký tài khoản; tham gia lớp bằng mã lớp; xem lớp, đề thi và lịch sử bài nộp của chính mình; nộp ZIP; xem kết quả; rời lớp. Bài nộp là lịch sử chấm nên không thể sửa/xóa sau khi gửi. |
+| `STUDENT` | Đăng ký tài khoản; tham gia lớp bằng mã lớp; xem lớp, đề thi và bài nộp mới nhất của mình; nộp ZIP; xem điểm sau khi đề đóng; rời lớp. |
 | `LECTURER` | Tạo/sửa lớp mình phụ trách; xóa lớp trống; import Excel, xem roster, cho sinh viên rời lớp hoặc ghi danh lại; tạo/sửa đề và test case; xóa đề khi chưa có bài nộp; xem submissions và báo cáo AST/Winnowing. |
 | `ADMIN` | Tạo/xem/sửa tài khoản, đặt mật khẩu mới, đổi role, kích hoạt/vô hiệu hóa; có quyền hỗ trợ xem và quản lý lớp/đề. Vô hiệu hóa là thao tác xóa an toàn: thu hồi phiên đăng nhập và giữ lại bài nộp, enrollment cùng kết quả. |
 
@@ -182,14 +183,14 @@ Tự đăng ký chỉ tạo vai trò `STUDENT`. Để có giảng viên khi ch�
 ### Giảng viên
 
 1. Tạo lớp tại dashboard.
-2. Import file `.xlsx` với hai cột **Email**, **Họ tên**. Xem preview, kiểm tra mapping rồi xác nhận import. Import dùng transaction: lỗi sẽ rollback toàn bộ batch.
+2. Import file `.xlsx` với hai cột **Email**, **Họ tên**. Xem preview, kiểm tra mapping và trạng thái tài khoản rồi xác nhận import. Chỉ tài khoản `STUDENT` đang hoạt động đã có trong database mới được ghi danh; email chưa có tài khoản sẽ bị bỏ qua. Import dùng transaction: lỗi sẽ rollback toàn bộ batch.
 3. Tạo bài kiểm tra, chọn **PYTHON / CSHARP / JAVA**, mô tả và test case. Thời gian 1..10000 ms/test, RAM 64..512 MiB/test; mặc định 2000 ms, 512 MiB.
 4. Đánh dấu test ẩn nếu cần. Đặt tổng `scoreWeight` theo thang điểm muốn dùng, ví dụ 5 test × 20 = 100.
 5. Vào trang bài nộp/kết quả của lớp. Trang tự tải lại dữ liệu mỗi 5 giây, gồm trạng thái AST và các cặp bài tương đồng.
 
 Trong dashboard giảng viên, **Sửa lớp** cập nhật thông tin; **Danh sách SV** mở roster để rời lớp/ghi danh lại; **Danh sách đề** cho sửa đề và test case. Các nút xóa bị khóa khi lớp/đề đã có dữ liệu phụ thuộc.
 
-Tài khoản sinh viên do import tạo chưa có mật khẩu mặc định; đăng nhập Google bằng đúng email đã import. Muốn thử email/mật khẩu khi chưa có Client ID, cho sinh viên tự đăng ký trước rồi import email đó vào lớp.
+Import không tạo tài khoản và không đổi mật khẩu. Muốn import email mới, cần tạo tài khoản sinh viên trước; sau đó mới nhập email đó vào roster.
 
 ### Sinh viên
 

@@ -10,6 +10,11 @@ const accounts = [
   { email: 'admin.test@fpt.edu.vn', fullName: 'Quản trị viên Test', role: 'ADMIN' },
   { email: 'lecturer.test@fpt.edu.vn', fullName: 'Giảng viên Test', role: 'LECTURER' },
   { email: 'student.test@fpt.edu.vn', fullName: 'Nguyễn Văn Test', role: 'STUDENT' },
+  { email: 'student.test02@fpt.edu.vn', fullName: 'Trần Thị Minh Anh', role: 'STUDENT' },
+  { email: 'student.test03@fpt.edu.vn', fullName: 'Lê Hoàng Nam', role: 'STUDENT' },
+  { email: 'student.test04@fpt.edu.vn', fullName: 'Phạm Ngọc Hà', role: 'STUDENT' },
+  { email: 'student.test05@fpt.edu.vn', fullName: 'Hoàng Minh Đức', role: 'STUDENT' },
+  { email: 'rollback.probe@fpt.edu.vn', fullName: 'Sinh viên kiểm tra rollback', role: 'STUDENT' },
 ];
 const classCode = 'AITA-TEST-001';
 const examTitle = 'Bài kiểm tra Test - Tổng hai số nguyên';

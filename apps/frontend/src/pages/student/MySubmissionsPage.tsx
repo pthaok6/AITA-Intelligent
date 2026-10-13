@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
 
+const formatDate = (value: string) => new Date(value).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
 export const MySubmissionsPage: React.FC = () => {
   const { examId } = useParams<{ examId: string }>();
   const [items, setItems] = useState<any[]>([]);
@@ -20,8 +22,9 @@ export const MySubmissionsPage: React.FC = () => {
   }, [examId]);
   return <div className="container">
     <p><Link to="/student">← Quay lại lớp học</Link></p>
-    <h2>Lịch sử bài nộp{exam ? `: ${exam.title}` : ''}</h2>
+    <h2>Bài nộp mới nhất{exam ? `: ${exam.title}` : ''}</h2>
+    {exam && items.some(item => !item.scoreReleased) && <p>Điểm và kết quả chấm sẽ được công bố sau khi hết hạn nộp.</p>}
     {error && <p role="alert" style={{ color: '#f87171' }}>{error}</p>}
-    <div className="card" style={{ marginTop: '1rem' }}>{items.length === 0 ? <p>Bạn chưa nộp bài cho đề thi này.</p> : <table className="table"><thead><tr><th>Thời điểm nộp</th><th>Trạng thái</th><th>Điểm</th><th>Phân tích mã</th><th></th></tr></thead><tbody>{items.map(item => <tr key={item.id}><td>{new Date(item.submittedAt).toLocaleString('vi-VN')}</td><td>{item.status}</td><td>{item.totalScore}</td><td>{item.astStatus}</td><td><Link className="btn btn-secondary" to={`/student/submissions/${item.id}`}>Xem kết quả</Link></td></tr>)}</tbody></table>}</div>
+    <div className="card" style={{ marginTop: '1rem' }}>{items.length === 0 ? <p>Bạn chưa nộp bài cho đề thi này.</p> : <table className="table"><thead><tr><th>Ngày nộp</th><th>Trạng thái</th><th>Điểm</th><th></th></tr></thead><tbody>{items.map(item => <tr key={item.id}><td>{formatDate(item.submittedAt)}</td><td>{item.status}</td><td>{item.scoreReleased ? item.totalScore : 'Chờ công bố'}</td><td><Link className="btn btn-secondary" to={`/student/submissions/${item.id}`}>Xem bài nộp</Link></td></tr>)}</tbody></table>}</div>
   </div>;
 };

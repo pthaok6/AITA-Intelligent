@@ -11,6 +11,7 @@
     "test": "npm run build && node --test tests/unit.test.cjs tests/rbl-unit.test.cjs",
     "test:sandbox": "npm run build && node --test --test-concurrency=1 tests/docker.test.cjs tests/sandbox-integration.test.cjs",
     "test:db:setup": "node scripts/setup-test-db.cjs",
+    "seed:demo": "node scripts/seed-test-accounts.cjs",
     "test:integration": "npm run build && node --test tests/integration.test.cjs",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",

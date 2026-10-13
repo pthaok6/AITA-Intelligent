@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
+import { MarkdownPreview } from '../../components/MarkdownPreview';
 
 export const CreateExamPage: React.FC = () => {
   const { classId } = useParams<{ classId: string }>();
@@ -12,7 +13,7 @@ export const CreateExamPage: React.FC = () => {
   const [timeLimitMs, setTimeLimitMs] = useState(2000);
   const [memoryLimitMb, setMemoryLimitMb] = useState(512);
 
-  // Test cases state
+  // Danh sách test case
   const [testCases, setTestCases] = useState<Array<{ inputData: string; expectedOutput: string; isHidden: boolean; scoreWeight: number }>>([
     { inputData: '3 5', expectedOutput: '8', isHidden: false, scoreWeight: 5.0 },
     { inputData: '10 20', expectedOutput: '30', isHidden: true, scoreWeight: 5.0 },
@@ -38,7 +39,7 @@ export const CreateExamPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (testCases.length === 0) {
-      setError('Vui lòng thêm ít nhất 1 test case');
+      setError('Vui lòng thêm ít nhất một test case.');
       return;
     }
 
@@ -83,7 +84,7 @@ export const CreateExamPage: React.FC = () => {
       </div>
 
       <div className="card">
-        <h2 style={{ marginBottom: '1.5rem' }}>Tạo Bài Thi & Bộ Test Cases Mới</h2>
+        <h2 style={{ marginBottom: '1.5rem' }}>Tạo bài thi và bộ test case</h2>
 
         {error && (
           <div style={{ background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', color: '#f87171', padding: '0.75rem', borderRadius: '0.5rem', marginBottom: '1rem' }}>
@@ -105,15 +106,25 @@ export const CreateExamPage: React.FC = () => {
           </div>
 
           <div className="form-group">
-            <label>Mô tả đề bài (Markdown)</label>
-            <textarea
-              className="form-control"
-              rows={4}
-              placeholder="Cho 2 số nguyên a và b trên cùng một dòng. In ra tổng a + b."
-              value={descriptionMd}
-              onChange={(e) => setDescriptionMd(e.target.value)}
-              required
-            />
+            <label htmlFor="exam-description">Mô tả đề bài (Markdown)</label>
+            <div className="markdown-editor-preview">
+              <div>
+                <span className="markdown-panel-title">Nội dung Markdown</span>
+                <textarea
+                  id="exam-description"
+                  className="form-control markdown-editor"
+                  rows={12}
+                  placeholder="# Mô tả bài toán\nCho hai số nguyên a và b trên cùng một dòng.\n\nIn ra tổng a + b."
+                  value={descriptionMd}
+                  onChange={(e) => setDescriptionMd(e.target.value)}
+                  required
+                />
+              </div>
+              <section aria-label="Xem trước đề bài">
+                <span className="markdown-panel-title">Xem trước</span>
+                <MarkdownPreview content={descriptionMd} />
+              </section>
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
@@ -126,7 +137,7 @@ export const CreateExamPage: React.FC = () => {
               </select>
             </div>
             <div className="form-group">
-              <label>Giới hạn CPU (ms)</label>
+              <label>Thời gian chạy tối đa (ms)</label>
               <input
                 type="number"
                 className="form-control"
@@ -135,7 +146,7 @@ export const CreateExamPage: React.FC = () => {
               />
             </div>
             <div className="form-group">
-              <label>Giới hạn RAM (MB)</label>
+              <label>Bộ nhớ tối đa (MiB)</label>
               <input
                 type="number"
                 className="form-control"
@@ -148,16 +159,16 @@ export const CreateExamPage: React.FC = () => {
           <hr style={{ borderColor: 'var(--border)', margin: '1.5rem 0' }} />
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h4>Bộ Test Cases Chấm Điểm Tự Động</h4>
+            <h4>Bộ test case chấm điểm tự động</h4>
             <button type="button" onClick={addTestCaseRow} className="btn btn-secondary">
-              + Thêm Test Case
+              + Thêm test case
             </button>
           </div>
 
           {testCases.map((tc, idx) => (
             <div key={idx} style={{ background: '#090d16', border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', marginBottom: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Test Case #{idx + 1}</span>
+                <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Test case {idx + 1}</span>
                 {testCases.length > 1 && (
                   <button type="button" className="btn btn-ghost-danger btn-sm" onClick={() => removeTestCaseRow(idx)}>
                     Xóa
@@ -166,7 +177,7 @@ export const CreateExamPage: React.FC = () => {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.5rem' }}>
                 <div>
-                  <label style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Dữ liệu đầu vào (StdIn)</label>
+                  <label style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Dữ liệu đầu vào</label>
                   <input
                     type="text"
                     className="form-control"
@@ -177,7 +188,7 @@ export const CreateExamPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Kết quả kỳ vọng (StdOut)</label>
+                  <label style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Kết quả mong đợi</label>
                   <input
                     type="text"
                     className="form-control"
@@ -195,7 +206,7 @@ export const CreateExamPage: React.FC = () => {
                     checked={tc.isHidden}
                     onChange={(e) => updateTestCase(idx, 'isHidden', e.target.checked)}
                   />
-                  Test case ẩn (Chỉ dùng chấm điểm, giấu với sinh viên)
+                  Test case ẩn (chỉ dùng để chấm điểm, không hiển thị cho sinh viên)
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Điểm:</span>

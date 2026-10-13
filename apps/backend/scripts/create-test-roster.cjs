@@ -57,15 +57,19 @@ async function main() {
   assert.deepEqual(parsed.mapping, { email: 1, fullName: 2 });
   assert.deepEqual(parsed.errors, []);
   assert.deepEqual(parsed.rows.map(row => [row.email, row.fullName]), rows);
-  const users = await prisma.user.findMany({ where: { email: { in: rows.map(row => row[0]) } } });
-  assert(users.every(user => user.role === 'STUDENT' && user.isActive), 'Có email thuộc tài khoản không hợp lệ cho import.');
+  const existingEmails = rows.slice(0, 5).map(row => row[0]);
+  const users = await prisma.user.findMany({ where: { email: { in: existingEmails } } });
+  assert.equal(users.length, 5, 'Cần seed đủ năm tài khoản sinh viên demo đầu tiên.');
+  assert(users.every(user => user.role === 'STUDENT' && user.isActive), 'Tài khoản demo cần là sinh viên đang hoạt động.');
   const cls = await prisma.class.findUniqueOrThrow({ where: { classCode: 'AITA-TEST-001' } });
   const beforeCount = await prisma.classEnrollment.count({ where: { classId: cls.id } });
   const preview = await rosterImportService.preview(cls.id, { userId: cls.lecturerId, role: 'LECTURER' }, buffer);
   assert.equal(preview.totalRows, 10);
   assert.deepEqual(preview.errors, []);
+  assert.equal(preview.rows.filter(row => row.accountStatus === 'READY').length, 5);
+  assert.equal(preview.rows.filter(row => row.accountStatus === 'NOT_FOUND').length, 5);
   assert(preview.previewToken);
   assert.equal(await prisma.classEnrollment.count({ where: { classId: cls.id } }), beforeCount);
-  console.log(JSON.stringify({ file, students: parsed.rows.length, bytes: buffer.length, mapping: parsed.mapping, errors: parsed.errors, previewVerified: true, enrollmentCount: beforeCount }, null, 2));
+  console.log(JSON.stringify({ file, students: parsed.rows.length, existingDemoAccounts: 5, skippedUnknownAccounts: 5, bytes: buffer.length, mapping: parsed.mapping, errors: parsed.errors, previewVerified: true, enrollmentCount: beforeCount }, null, 2));
 }
 main().catch(error => { console.error(error.message); process.exitCode = 1; }).finally(() => prisma.$disconnect());

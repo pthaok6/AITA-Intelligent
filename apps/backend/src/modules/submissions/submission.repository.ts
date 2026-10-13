@@ -1,5 +1,6 @@
 import { prisma } from '../../infrastructure/database/prisma';
 import { SubmissionStatus } from '../../domain/enums';
+import { Prisma } from '@prisma/client';
 
 export class SubmissionRepository {
   async create(data: {
@@ -9,13 +10,28 @@ export class SubmissionRepository {
     fileHashSha256: string;
     artifactType?: string;
     astStatus?: string;
+    originalFilename?: string;
+    entrypoint?: string;
+    sourceFiles?: Array<{ path: string; size: number }>;
   }) {
-    return prisma.submission.create({
-      data: {
-        ...data,
-        status: SubmissionStatus.QUEUED,
-      },
-    });
+    const { sourceFiles, ...submissionData } = data;
+    for (let retry = 0; ; retry++) {
+      try {
+        return await prisma.$transaction(async tx => {
+          const latest = await tx.submission.findFirst({ where: { examId: data.examId, studentId: data.studentId }, orderBy: { attemptNumber: 'desc' }, select: { attemptNumber: true } });
+          return tx.submission.create({
+            data: {
+              ...submissionData,
+              attemptNumber: (latest?.attemptNumber ?? 0) + 1,
+              status: SubmissionStatus.QUEUED,
+              ...(sourceFiles ? { sourceFiles: { create: sourceFiles } } : {}),
+            },
+          });
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      } catch (error: any) {
+        if (retry >= 2 || !['P2002', 'P2034'].includes(error?.code)) throw error;
+      }
+    }
   }
 
   async findById(id: string) {
@@ -23,8 +39,9 @@ export class SubmissionRepository {
       where: { id },
       include: {
         _count: { select: { fingerprints: true } },
-        exam: { select: { id: true, title: true, allowedLanguage: true, classId: true } },
+        exam: { select: { id: true, title: true, allowedLanguage: true, classId: true, endTime: true } },
         student: { select: { id: true, fullName: true, email: true } },
+        sourceFiles: { select: { path: true, size: true }, orderBy: { path: 'asc' } },
         testResults: {
           include: { testCase: { select: { id: true, orderIndex: true, scoreWeight: true, isHidden: true } } },
           orderBy: { testCase: { orderIndex: 'asc' } },
@@ -34,13 +51,26 @@ export class SubmissionRepository {
   }
 
   async findByExamId(examId: string, studentId?: string) {
-    return prisma.submission.findMany({
+    const attempts = await prisma.submission.findMany({
       where: { examId, ...(studentId ? { studentId } : {}) },
       include: {
         student: { select: { id: true, fullName: true, email: true } },
         _count: { select: { testResults: true } },
       },
-      orderBy: { submittedAt: 'desc' },
+      orderBy: { attemptNumber: 'desc' },
+    });
+    const latestByStudent = new Map<string, typeof attempts[number]>();
+    for (const attempt of attempts) {
+      if (!latestByStudent.has(attempt.studentId)) latestByStudent.set(attempt.studentId, attempt);
+    }
+    return [...latestByStudent.values()];
+  }
+
+  async findLatestForStudent(examId: string, studentId: string) {
+    return prisma.submission.findFirst({
+      where: { examId, studentId },
+      select: { id: true },
+      orderBy: { attemptNumber: 'desc' },
     });
   }
 

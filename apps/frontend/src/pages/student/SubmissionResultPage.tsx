@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 
+const formatDate = (value: string) => new Date(value).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
 export const SubmissionResultPage: React.FC = () => {
   const { user } = useAuth();
   const { id } = useParams(); const [submission, setSubmission] = useState<any>(null), [error, setError] = useState('');
@@ -13,7 +15,8 @@ export const SubmissionResultPage: React.FC = () => {
       if (!active) return;
       if (!res.success) { setError(res.message || 'Không tải được kết quả.'); return; }
       setSubmission(res.data);
-      if (['QUEUED', 'RUNNING'].includes(res.data.status) || ['PENDING', 'RUNNING'].includes(res.data.astStatus) && ['COMPLETED', 'COMPILE_ERROR'].includes(res.data.status)) timer = setTimeout(load, 1500);
+      if (!res.data.scoreReleased) timer = setTimeout(load, 30000);
+      else if (['QUEUED', 'RUNNING'].includes(res.data.status) || ['PENDING', 'RUNNING'].includes(res.data.astStatus) && ['COMPLETED', 'COMPILE_ERROR'].includes(res.data.status)) timer = setTimeout(load, 1500);
     }
     void load(); return () => { active = false; clearTimeout(timer); };
   }, [id]);
@@ -25,15 +28,16 @@ export const SubmissionResultPage: React.FC = () => {
     <div className="card" style={{ marginTop: '1rem' }}>
       <h2>{submission.exam.title}</h2>
       <span className={'badge ' + (submission.status === 'COMPLETED' ? 'badge-green' : 'badge-yellow')}>{submission.status}</span>
-      <p><strong>{submission.totalScore} điểm</strong> · {submission.exam.allowedLanguage} · {new Date(submission.submittedAt).toLocaleString('vi-VN')}</p>
-      {waiting && <p>Worker đang xử lý bài nộp. Kết quả sẽ tự cập nhật.</p>}
+      <p>{submission.scoreReleased && <><strong>{submission.totalScore} điểm</strong> · </>}{submission.exam.allowedLanguage} · {formatDate(submission.submittedAt)}</p>
+      {!submission.scoreReleased && <p>Đã ghi nhận bài nộp mới nhất. Điểm và kết quả chấm sẽ hiển thị sau khi hết hạn nộp.</p>}
+      {submission.scoreReleased && waiting && <p>Worker đang xử lý bài nộp. Kết quả sẽ tự cập nhật.</p>}
       {submission.compileMessage && <details open={submission.status !== 'COMPLETED'}><summary>Thông báo compiler / worker</summary><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{submission.compileMessage}</pre></details>}
       <h3>Bài nộp</h3><p>{submission.originalFilename || 'Bài nộp cũ'} · {submission.entrypoint}</p>
       <p style={{ overflowWrap: 'anywhere' }}>SHA-256: <code>{submission.fileHashSha256}</code></p>
       {submission.artifactType === 'ZIP' && <a href={'/api/submissions/' + id + '/archive'} className="btn btn-secondary">Tải ZIP đã nộp</a>}
       <ul>{submission.sourceFiles?.map((file: any) => <li key={file.path}>{file.path} ({file.size} bytes)</li>)}</ul>
     </div>
-    <div className="card" style={{ marginTop: '1rem' }}>
+    {submission.scoreReleased && <><div className="card" style={{ marginTop: '1rem' }}>
       <h3>Kết quả test case</h3>
       <table className="table"><thead><tr><th>Test</th><th>Trạng thái</th><th>Thời gian</th><th>RAM đo được</th><th>Điểm</th></tr></thead>
         <tbody>{submission.testResults?.map((result: any) => <tr key={result.id}>
@@ -53,6 +57,6 @@ export const SubmissionResultPage: React.FC = () => {
       {submission.astVersion && <p>{submission.astVersion} · k = {submission.astK} · w = {submission.astW}</p>}
       {submission.astMessage && <pre style={{ whiteSpace: 'pre-wrap' }}>{submission.astMessage}</pre>}
       <p>Giảng viên có thể xem tỷ lệ tương đồng giữa các bài nộp trong trang kết quả của lớp.</p>
-    </div>
+    </div></>}
   </div>;
 };
