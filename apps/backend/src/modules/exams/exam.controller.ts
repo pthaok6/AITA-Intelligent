@@ -21,7 +21,7 @@ examRouter.get('/class/:classId', authenticateJwt, async (req: AuthRequest, res:
 // Giảng viên tạo đề thi
 examRouter.post('/', authenticateJwt, requireRoles(UserRole.LECTURER, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
   try {
-    const { classId, title, descriptionMd, allowedLanguage, timeLimitMs, memoryLimitMb, startTime, endTime, testCases } = req.body;
+    const { classId, title, descriptionMd, allowedLanguage, examType, timeLimitMs, memoryLimitMb, startTime, endTime, testCases } = req.body;
     if (!classId || !title || !descriptionMd || !startTime || !endTime) {
       res.status(400).json({ success: false, message: 'Vui lòng điền đủ thông tin bài thi bắt buộc' });
       return;
@@ -32,6 +32,7 @@ examRouter.post('/', authenticateJwt, requireRoles(UserRole.LECTURER, UserRole.A
       title,
       descriptionMd,
       allowedLanguage: allowedLanguage || 'PYTHON',
+      examType: examType || 'INDIVIDUAL',
       timeLimitMs,
       memoryLimitMb,
       startTime,

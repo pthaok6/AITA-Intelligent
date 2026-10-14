@@ -22,6 +22,7 @@ model User {
   enrollments     ClassEnrollment[]
   submissions     Submission[]
   sessions        AuthSession[]
+  teamMemberships TeamMember[]
 
   @@map("users")
 }
@@ -74,6 +75,7 @@ model Exam {
   title           String
   descriptionMd   String
   allowedLanguage String         @default("PYTHON") // PYTHON, CSHARP, JAVA
+  examType        String         @default("INDIVIDUAL") // INDIVIDUAL, GROUP
   timeLimitMs     Int            @default(2000)
   memoryLimitMb   Int            @default(512)
   startTime       DateTime
@@ -83,6 +85,7 @@ model Exam {
   class           Class          @relation(fields: [classId], references: [id], onDelete: Cascade)
   testCases       TestCase[]
   submissions     Submission[]
+  teams           Team[]
   plagiarismReports PlagiarismReport[]
 
   @@map("exams")
@@ -109,6 +112,7 @@ model Submission {
   id             String          @id @default(uuid())
   examId         String
   studentId      String
+  teamId         String?
   attemptNumber  Int             @default(1)
   sourceCodeUrl  String          // Storage key for ZIP; legacy text preserved by migration
   fileHashSha256 String
@@ -130,6 +134,7 @@ model Submission {
 
   exam           Exam            @relation(fields: [examId], references: [id], onDelete: Cascade)
   student        User            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  team           Team?           @relation(fields: [teamId], references: [id], onDelete: SetNull)
   testResults    SubmissionTestResult[]
   sourceFiles    SubmissionFile[]
   fingerprints   ASTFingerprint[]
@@ -231,3 +236,59 @@ model AIReview {
   @@index([submissionId])
   @@map("ai_reviews")
 }
+
+model Team {
+  id            String            @id @default(uuid())
+  examId        String
+  name          String
+  repoUrl       String?
+  createdAt     DateTime          @default(now())
+
+  exam          Exam              @relation(fields: [examId], references: [id], onDelete: Cascade)
+  members       TeamMember[]
+  submissions   Submission[]
+  contributions GitContribution[]
+
+  @@unique([examId, name])
+  @@index([examId])
+  @@map("teams")
+}
+
+model TeamMember {
+  id             String            @id @default(uuid())
+  teamId         String
+  studentId      String
+  role           String            @default("MEMBER") // LEADER, MEMBER
+  githubUsername String?
+  joinedAt       DateTime          @default(now())
+
+  team           Team              @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  student        User              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  contributions  GitContribution[]
+
+  @@unique([teamId, studentId])
+  @@index([teamId])
+  @@index([studentId])
+  @@map("team_members")
+}
+
+model GitContribution {
+  id                  String       @id @default(uuid())
+  teamId              String
+  memberId            String
+  commitsCount        Int          @default(0)
+  locAdded            Int          @default(0)
+  locDeleted          Int          @default(0)
+  contributionPercent Float        @default(0.0) // 0.0 - 100.0%
+  personalScore       Float?       // Derived per BR-12: TeamScore * ContributionFactor
+  isWarning           Boolean      @default(false) // BR-05: true if contributionPercent < 5.0%
+  syncedAt            DateTime     @default(now())
+
+  team                Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  member              TeamMember   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, memberId])
+  @@index([teamId])
+  @@map("git_contributions")
+}
+

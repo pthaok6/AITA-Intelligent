@@ -6,6 +6,7 @@ export class ExamRepository {
     title: string;
     descriptionMd: string;
     allowedLanguage: string;
+    examType?: string;
     timeLimitMs?: number;
     memoryLimitMb?: number;
     startTime: Date;

@@ -24,6 +24,7 @@ export const ExamTakePage: React.FC = () => {
     {exam && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginTop: '1rem' }}>
       <div className="card">
         <span className="badge badge-blue">{exam.allowedLanguage === 'PYTHON' ? 'Python 3' : exam.allowedLanguage === 'JAVA' ? 'Java 17' : 'C# .NET 8'}</span>
+        {exam.examType === 'GROUP' && <span className="badge badge-yellow" style={{ marginLeft: '0.5rem', background: '#854d0e', color: '#fef08a' }}>Bài tập nhóm (Leader nộp)</span>}
         <h2>{exam.title}</h2><p>{exam.timeLimitMs} ms · {exam.memoryLimitMb} MiB</p>
         <MarkdownPreview content={exam.descriptionMd} />
         <h3>Test case công khai</h3>

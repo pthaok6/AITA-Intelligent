@@ -9,6 +9,7 @@ import { classRouter } from './modules/classes/class.controller';
 import { examRouter } from './modules/exams/exam.controller';
 import { submissionRouter } from './modules/submissions/submission.controller';
 import { adminRouter } from './modules/auth/admin.controller';
+import { teamRouter } from './modules/teams/team.controller';
 
 export const app = express();
 
@@ -32,6 +33,7 @@ app.use('/api/admin', adminRouter);
 app.use('/api/classes', rosterImportRouter);
 app.use('/api/classes', classRouter);
 app.use('/api/exams', examRouter);
+app.use('/api', teamRouter);
 app.use('/api', submissionRouter);
 
 app.get('/api/health', (req, res) => {

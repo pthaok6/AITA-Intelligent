@@ -6,6 +6,7 @@ export class SubmissionRepository {
   async create(data: {
     examId: string;
     studentId: string;
+    teamId?: string;
     sourceCodeUrl: string;
     fileHashSha256: string;
     artifactType?: string;
@@ -39,8 +40,9 @@ export class SubmissionRepository {
       where: { id },
       include: {
         _count: { select: { fingerprints: true } },
-        exam: { select: { id: true, title: true, allowedLanguage: true, classId: true, endTime: true } },
+        exam: { select: { id: true, title: true, allowedLanguage: true, classId: true, endTime: true, examType: true } },
         student: { select: { id: true, fullName: true, email: true } },
+        team: { select: { id: true, name: true, repoUrl: true } },
         sourceFiles: { select: { path: true, size: true }, orderBy: { path: 'asc' } },
         testResults: {
           include: { testCase: { select: { id: true, orderIndex: true, scoreWeight: true, isHidden: true } } },

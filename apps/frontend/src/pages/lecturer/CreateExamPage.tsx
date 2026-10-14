@@ -10,6 +10,7 @@ export const CreateExamPage: React.FC = () => {
   const [title, setTitle] = useState('');
   const [descriptionMd, setDescriptionMd] = useState('');
   const [allowedLanguage, setAllowedLanguage] = useState('PYTHON');
+  const [examType, setExamType] = useState('INDIVIDUAL');
   const [timeLimitMs, setTimeLimitMs] = useState(2000);
   const [memoryLimitMb, setMemoryLimitMb] = useState(512);
 
@@ -61,6 +62,7 @@ export const CreateExamPage: React.FC = () => {
         title,
         descriptionMd,
         allowedLanguage,
+        examType,
         timeLimitMs: Number(timeLimitMs),
         memoryLimitMb: Number(memoryLimitMb),
         startTime,
@@ -127,7 +129,14 @@ export const CreateExamPage: React.FC = () => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+            <div className="form-group">
+              <label>Hình thức bài thi</label>
+              <select className="form-control" value={examType} onChange={(e) => setExamType(e.target.value)}>
+                <option value="INDIVIDUAL">Cá nhân (Student)</option>
+                <option value="GROUP">Theo nhóm (Team)</option>
+              </select>
+            </div>
             <div className="form-group">
               <label>Ngôn ngữ quy định</label>
               <select className="form-control" value={allowedLanguage} onChange={(e) => setAllowedLanguage(e.target.value)}>
