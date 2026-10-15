@@ -30,7 +30,7 @@ async function authorizedSubmission(req) {
     if (submission.studentId !== req.user.userId)
         await (0, class_access_1.classAccess)(submission.exam.classId, req.user, true);
     else if (await submission_service_1.submissionService.getLatestSubmissionId(submission.examId, req.user.userId) !== submission.id)
-        throw new http_1.HttpError(404, 'KhÃ´ng tÃ¬m tháº¥y bÃ i ná»™p hiá»‡n hÃ nh.');
+        throw new http_1.HttpError(404, 'Không tìm thấy bài nộp hiện hành.');
     return submission;
 }
 exports.submissionRouter.get('/submissions/:id/archive', auth_middleware_1.authenticateJwt, (0, http_1.asyncRoute)(async (req, res, next) => {

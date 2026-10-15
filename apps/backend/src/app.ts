@@ -10,6 +10,7 @@ import { examRouter } from './modules/exams/exam.controller';
 import { submissionRouter } from './modules/submissions/submission.controller';
 import { adminRouter } from './modules/auth/admin.controller';
 import { teamRouter } from './modules/teams/team.controller';
+import { appealRouter } from './modules/appeals/appeal.controller';
 import { aiRouter } from './modules/ai/ai.controller';
 
 export const app = express();
@@ -36,6 +37,7 @@ app.use('/api/classes', classRouter);
 app.use('/api/exams', examRouter);
 app.use('/api', teamRouter);
 app.use('/api', submissionRouter);
+app.use('/api/appeals', appealRouter);
 app.use('/api/ai', aiRouter);
 
 app.get('/api/health', (req, res) => {

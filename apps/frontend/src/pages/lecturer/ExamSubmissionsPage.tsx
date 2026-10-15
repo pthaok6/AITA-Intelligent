@@ -252,7 +252,7 @@ export const ExamSubmissionsPage: React.FC = () => {
       setError(!res.success ? res.message || 'Không tải được bài nộp.' : !report.success ? report.message || 'Không tải được báo cáo AST.' : '');
     };
     fetchSubmissions();
-    const timer = setInterval(fetchSubmissions, 5000);
+    const timer = setInterval(fetchSubmissions, 10000);
     return () => { active = false; clearInterval(timer); };
   }, [selectedExamId]);
 
@@ -285,15 +285,24 @@ export const ExamSubmissionsPage: React.FC = () => {
             ))}
           </div>
 
-          {selectedExam && <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', alignItems: 'center' }}>
-            <Link className="btn btn-secondary" to={`/lecturer/classes/${classId}/exams/${selectedExam.id}/edit`}>Sửa đề và test case</Link>
-            <button className="btn btn-ghost-danger" disabled={selectedExam._count?.submissions > 0} title="Không thể xóa đề đã có bài nộp" onClick={() => setConfirmDeleteExam(true)}>Xóa đề</button>
-            {selectedExam.examType === 'GROUP' && (
-              <button className="btn btn-primary" onClick={() => setShowCreateTeam(!showCreateTeam)}>
-                {showCreateTeam ? 'Đóng form tạo nhóm' : '+ Thêm nhóm mới'}
-              </button>
-            )}
-          </div>}
+          {selectedExam && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem', background: '#090d16', border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '0.75rem 1rem' }}>
+              <div style={{ fontSize: '0.875rem', color: '#94a3b8' }}>
+                ⏰ Thời gian: <strong style={{ color: '#60a5fa' }}>{new Date(selectedExam.startTime).toLocaleString('vi-VN')}</strong> — <strong style={{ color: '#f87171' }}>{new Date(selectedExam.endTime).toLocaleString('vi-VN')}</strong>
+                {selectedExam.timeLimitMs && <span> • CPU: <strong>{selectedExam.timeLimitMs}ms</strong></span>}
+                {selectedExam.memoryLimitMb && <span> • RAM: <strong>{selectedExam.memoryLimitMb}MiB</strong></span>}
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <Link className="btn btn-secondary btn-sm" to={`/lecturer/classes/${classId}/exams/${selectedExam.id}/edit`}>Sửa đề và test case</Link>
+                <button className="btn btn-ghost-danger btn-sm" disabled={selectedExam._count?.submissions > 0} title="Không thể xóa đề đã có bài nộp" onClick={() => setConfirmDeleteExam(true)}>Xóa đề</button>
+                {selectedExam.examType === 'GROUP' && (
+                  <button className="btn btn-primary btn-sm" onClick={() => setShowCreateTeam(!showCreateTeam)}>
+                    {showCreateTeam ? 'Đóng form tạo nhóm' : '+ Thêm nhóm mới'}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           {showCreateTeam && (
             <form className="card" onSubmit={handleCreateTeam} style={{ marginBottom: '1.5rem', background: '#1e293b' }}>

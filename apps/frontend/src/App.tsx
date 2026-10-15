@@ -15,10 +15,19 @@ import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 import { EditExamPage } from './pages/lecturer/EditExamPage';
 import { ClassRosterPage } from './pages/lecturer/ClassRosterPage';
 import { MySubmissionsPage } from './pages/student/MySubmissionsPage';
+import { MyAppealsPage } from './pages/student/MyAppealsPage';
+import { LecturerAppealsPage } from './pages/lecturer/LecturerAppealsPage';
 
 const RootRedirect: React.FC = () => {
   const { isAuthenticated, user, loading } = useAuth();
-  if (loading) return <p className="container">Đang tải phiên đăng nhập...</p>;
+  if (loading) {
+    return (
+      <div className="container" style={{ textAlign: 'center', paddingTop: '5rem' }}>
+        <p style={{ color: '#60a5fa', fontSize: '1.1rem', marginBottom: '0.5rem' }}>Đang kiểm tra phiên đăng nhập...</p>
+        <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>Vui lòng đợi giây lát</span>
+      </div>
+    );
+  }
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (user?.role !== 'STUDENT') return <Navigate to="/lecturer" replace />;
   return <Navigate to="/student" replace />;
@@ -26,7 +35,13 @@ const RootRedirect: React.FC = () => {
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; allowedRoles?: string[] }> = ({ children, allowedRoles }) => {
   const { isAuthenticated, user, loading } = useAuth();
-  if (loading) return <p className="container">Đang tải phiên đăng nhập...</p>;
+  if (loading) {
+    return (
+      <div className="container" style={{ textAlign: 'center', paddingTop: '5rem' }}>
+        <p style={{ color: '#60a5fa', fontSize: '1.1rem', marginBottom: '0.5rem' }}>Đang tải dữ liệu...</p>
+      </div>
+    );
+  }
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {
     return <Navigate to="/" replace />;
@@ -75,6 +90,14 @@ export const App: React.FC = () => {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/lecturer/appeals"
+                element={
+                  <ProtectedRoute allowedRoles={['LECTURER', 'ADMIN']}>
+                    <LecturerAppealsPage />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Student Routes */}
               <Route
@@ -82,6 +105,14 @@ export const App: React.FC = () => {
                 element={
                   <ProtectedRoute allowedRoles={['STUDENT', 'ADMIN', 'LECTURER']}>
                     <StudentDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/student/appeals"
+                element={
+                  <ProtectedRoute allowedRoles={['STUDENT', 'ADMIN', 'LECTURER']}>
+                    <MyAppealsPage />
                   </ProtectedRoute>
                 }
               />

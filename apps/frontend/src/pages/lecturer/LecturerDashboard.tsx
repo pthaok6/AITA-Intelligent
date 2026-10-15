@@ -84,9 +84,14 @@ export const LecturerDashboard: React.FC = () => {
           <h2>Quản lý Lớp học & Đề thi</h2>
           <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Xem danh sách lớp học và quản lý bài kiểm tra thực hành</p>
         </div>
-        <button onClick={() => { setClassCode(''); setName(''); setSemester('SU26'); setShowCreateModal(true); }} className="btn btn-primary">
-          + Tạo lớp học mới
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <Link to="/lecturer/appeals" className="btn btn-secondary">
+            📬 Hộp thư khiếu nại
+          </Link>
+          <button onClick={() => { setClassCode(''); setName(''); setSemester('SU26'); setShowCreateModal(true); }} className="btn btn-primary">
+            + Tạo lớp học mới
+          </button>
+        </div>
       </div>
       {error && <p role="alert" style={{ color: '#fca5a5', marginBottom: '1rem' }}>{error}</p>}
 

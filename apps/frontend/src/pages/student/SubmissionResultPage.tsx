@@ -13,14 +13,41 @@ const formatDate = (value: string) =>
     minute: '2-digit',
   });
 
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case 'SUBMITTED':
+      return <span className="badge badge-yellow">Chờ tiếp nhận</span>;
+    case 'IN_REVIEW':
+      return <span className="badge badge-blue">Đang xem xét</span>;
+    case 'ACCEPTED':
+      return <span className="badge badge-green">Đã chấp nhận</span>;
+    case 'REJECTED':
+      return <span className="badge badge-red">Đã từ chối</span>;
+    default:
+      return <span className="badge">{status}</span>;
+  }
+};
+
 export const SubmissionResultPage: React.FC = () => {
   const { user } = useAuth();
   const { id } = useParams();
   const [submission, setSubmission] = useState<any>(null);
   const [error, setError] = useState('');
+
+  // AI Review States
   const [triggeringAiReview, setTriggeringAiReview] = useState(false);
   const [explainingError, setExplainingError] = useState(false);
   const [manualExplanation, setManualExplanation] = useState<any>(null);
+
+  // Appeals States
+  const [appeals, setAppeals] = useState<any[]>([]);
+  const [showAppealModal, setShowAppealModal] = useState(false);
+  const [appealTitle, setAppealTitle] = useState('');
+  const [appealReason, setAppealReason] = useState('');
+  const [appealExpectedScore, setAppealExpectedScore] = useState<string>('');
+  const [submittingAppeal, setSubmittingAppeal] = useState(false);
+  const [appealError, setAppealError] = useState('');
+  const [appealSuccess, setAppealSuccess] = useState('');
 
   const loadSubmission = async () => {
     const res = await apiRequest('/submissions/' + id);
@@ -28,6 +55,14 @@ export const SubmissionResultPage: React.FC = () => {
       setSubmission(res.data);
     } else {
       setError(res.message || 'Không tải được kết quả.');
+    }
+  };
+
+  const fetchAppeals = async () => {
+    if (!id) return;
+    const res = await apiRequest(`/appeals/submission/${id}`);
+    if (res.success && res.data) {
+      setAppeals(res.data);
     }
   };
 
@@ -43,23 +78,26 @@ export const SubmissionResultPage: React.FC = () => {
         return;
       }
       setSubmission(res.data);
-      if (!res.data.scoreReleased && res.data.status !== 'COMPILE_ERROR') {
-        timer = setTimeout(poll, 30000);
-      } else if (
+      if (
         ['QUEUED', 'RUNNING'].includes(res.data.status) ||
         (['PENDING', 'RUNNING'].includes(res.data.astStatus) &&
           ['COMPLETED', 'COMPILE_ERROR'].includes(res.data.status))
       ) {
         timer = setTimeout(poll, 1500);
+      } else if (!res.data.scoreReleased && res.data.status !== 'COMPILE_ERROR') {
+        timer = setTimeout(poll, 30000);
       }
     }
 
     void poll();
+    if (user?.role === 'STUDENT') {
+      void fetchAppeals();
+    }
     return () => {
       active = false;
       clearTimeout(timer);
     };
-  }, [id]);
+  }, [id, user]);
 
   // Trigger on-demand AI Semantic Review
   const handleTriggerAiReview = async () => {
@@ -102,6 +140,44 @@ export const SubmissionResultPage: React.FC = () => {
     }
   };
 
+  const handleOpenAppealModal = () => {
+    setAppealTitle(`Khiếu nại kết quả chấm - ${submission?.exam?.title || ''}`);
+    setAppealReason('');
+    setAppealExpectedScore('');
+    setAppealError('');
+    setAppealSuccess('');
+    setShowAppealModal(true);
+  };
+
+  const handleSubmitAppeal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!appealReason.trim()) {
+      setAppealError('Vui lòng nhập lý do khiếu nại cụ thể.');
+      return;
+    }
+    setSubmittingAppeal(true);
+    setAppealError('');
+
+    const res = await apiRequest('/appeals', {
+      method: 'POST',
+      body: JSON.stringify({
+        submissionId: id,
+        title: appealTitle.trim(),
+        reason: appealReason.trim(),
+        expectedScore: appealExpectedScore ? Number(appealExpectedScore) : undefined,
+      }),
+    });
+
+    setSubmittingAppeal(false);
+    if (res.success) {
+      setAppealSuccess('Đã gửi đơn khiếu nại thành công! Giảng viên phụ trách sẽ xem xét và phản hồi.');
+      setShowAppealModal(false);
+      void fetchAppeals();
+    } else {
+      setAppealError(res.message || 'Không thể gửi đơn khiếu nại.');
+    }
+  };
+
   if (error)
     return (
       <div className="container">
@@ -111,6 +187,9 @@ export const SubmissionResultPage: React.FC = () => {
   if (!submission) return <div className="container">Đang tải kết quả…</div>;
 
   const waiting = ['QUEUED', 'RUNNING'].includes(submission.status);
+  const isStudent = user?.role === 'STUDENT';
+  const hasActiveAppeal = appeals.some(a => ['SUBMITTED', 'IN_REVIEW'].includes(a.status));
+
   const latestAiReview = submission.aiReviews?.[0];
 
   // Parse error explanation from AIReview or manual request
@@ -135,8 +214,15 @@ export const SubmissionResultPage: React.FC = () => {
 
   return (
     <div className="container" style={{ maxWidth: 1000 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Link to={user?.role === 'STUDENT' ? '/student' : '/lecturer'}>← Quay lại Dashboard</Link>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <Link to={isStudent ? '/student' : '/lecturer'}>← Quay lại Dashboard</Link>
+          {isStudent && (
+            <Link to="/student/appeals" className="btn btn-secondary btn-sm">
+              ⚖️ Xem tất cả khiếu nại của tôi &rarr;
+            </Link>
+          )}
+        </div>
         {submission.scoreReleased && (
           <button
             type="button"
@@ -150,13 +236,19 @@ export const SubmissionResultPage: React.FC = () => {
         )}
       </div>
 
+      {appealSuccess && (
+        <div className="card" style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid #10b981', color: '#34d399', marginBottom: '1rem', padding: '0.75rem 1rem' }}>
+          {appealSuccess}
+        </div>
+      )}
+
       {/* CARD 1: SUBMISSION OVERVIEW */}
-      <div className="card" style={{ marginTop: '1rem' }}>
+      <div className="card" style={{ marginTop: '0.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div>
             <h2 style={{ margin: 0 }}>{submission.exam.title}</h2>
             <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: '0.25rem' }}>
-              Ngôn ngữ: <strong>{submission.exam.allowedLanguage}</strong> · Nộp lúc: {formatDate(submission.submittedAt)}
+              Lần nộp #{submission.attemptNumber || 1} • Ngôn ngữ: <strong>{submission.exam.allowedLanguage}</strong> · Nộp lúc: {formatDate(submission.submittedAt)}
             </p>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -208,7 +300,7 @@ export const SubmissionResultPage: React.FC = () => {
         </div>
       </div>
 
-      {/* CARD 2: AI COMPILATION ERROR EXPLAINER (UC-GenAI: Giải nghĩa lỗi biên dịch) */}
+      {/* CARD 2: AI COMPILATION ERROR EXPLAINER */}
       {(submission.status === 'COMPILE_ERROR' || submission.compileMessage) && (
         <div className="error-explainer-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
@@ -292,7 +384,7 @@ export const SubmissionResultPage: React.FC = () => {
         </div>
       )}
 
-      {/* CARD 3: SEMANTIC CODE REVIEW & CLEAN CODE SCORING (UC-GenAI: Semantic Code Review) */}
+      {/* CARD 3: SEMANTIC CODE REVIEW & CLEAN CODE SCORING */}
       {(submission.scoreReleased || user?.role !== 'STUDENT') && latestAiReview && (
         <div className="clean-code-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid rgba(59, 130, 246, 0.25)', paddingBottom: '1rem' }}>
@@ -392,7 +484,135 @@ export const SubmissionResultPage: React.FC = () => {
         </div>
       )}
 
-      {/* CARD 5: AST & WINNOWING PLAGIARISM */}
+      {/* CARD 5: GRADE APPEAL SECTION FOR STUDENT */}
+      {submission.scoreReleased && isStudent && (
+        <div className="card" style={{ marginTop: '1rem', borderLeft: '4px solid #3b82f6' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+            <div>
+              <h3 style={{ fontSize: '1.1rem', marginBottom: '0.25rem' }}>Khiếu nại điểm bài thi</h3>
+              <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                Nếu bạn nhận thấy kết quả chấm có sai sót hoặc cần thẩm định lại, bạn có thể tạo đơn khiếu nại gửi tới giảng viên phụ trách.
+              </p>
+            </div>
+            <div>
+              {!hasActiveAppeal ? (
+                <button onClick={handleOpenAppealModal} className="btn btn-primary btn-sm">
+                  ⚖️ Gửi khiếu nại điểm
+                </button>
+              ) : (
+                <span className="badge badge-yellow">Đã có khiếu nại đang chờ xử lý</span>
+              )}
+            </div>
+          </div>
+
+          {appeals.length > 0 && (
+            <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
+              <h4 style={{ fontSize: '0.95rem', marginBottom: '0.5rem', color: '#e2e8f0' }}>Lịch sử khiếu nại của bài này:</h4>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {appeals.map((app) => (
+                  <div key={app.id} style={{ background: '#090d16', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <strong style={{ fontSize: '0.95rem' }}>{app.title}</strong>
+                      {getStatusBadge(app.status)}
+                    </div>
+                    <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.25rem' }}>
+                      Lý do: <span style={{ color: '#cbd5e1' }}>{app.reason}</span>
+                    </p>
+                    {app.decisionReason && (
+                      <div style={{ marginTop: '0.5rem', padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '0.35rem', fontSize: '0.85rem' }}>
+                        <strong style={{ color: app.status === 'ACCEPTED' ? '#34d399' : '#f87171' }}>Phản hồi giảng viên: </strong>
+                        <span style={{ color: '#f1f5f9' }}>{app.decisionReason}</span>
+                        {app.newScore !== null && <span style={{ color: '#34d399', fontWeight: 'bold' }}> (Điểm cập nhật: {app.newScore})</span>}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Appeal Creation Modal */}
+      {showAppealModal && (
+        <div className="form-modal-overlay">
+          <div className="card form-modal-panel" style={{ width: 'min(36rem, 100%)' }}>
+            <h3 style={{ marginBottom: '0.75rem' }}>Tạo Đơn Khiếu Nại Điểm</h3>
+            <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '1rem' }}>
+              Đơn khiếu nại sẽ được gửi trực tiếp vào Hộp thư giải quyết của Giảng viên phụ trách lớp học.
+            </p>
+            {appealError && <p role="alert" style={{ color: '#f87171', marginBottom: '1rem' }}>{appealError}</p>}
+            <form onSubmit={handleSubmitAppeal}>
+              <div className="form-group">
+                <label>Tiêu đề khiếu nại</label>
+                <input
+                  className="form-control"
+                  value={appealTitle}
+                  onChange={(e) => setAppealTitle(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-group">
+                  <label>Điểm hiện tại</label>
+                  <input
+                    className="form-control"
+                    value={`${submission.totalScore} điểm`}
+                    disabled
+                    style={{ opacity: 0.7 }}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Điểm kỳ vọng (nếu có)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    className="form-control"
+                    placeholder="VD: 8.5"
+                    value={appealExpectedScore}
+                    onChange={(e) => setAppealExpectedScore(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Lý do và bằng chứng khiếu nại cụ thể *</label>
+                <textarea
+                  className="form-control"
+                  rows={4}
+                  placeholder="Mô tả chi tiết: Test case nào bạn nghi ngờ bị chấm sai? Lý do tại sao code chạy đúng nhưng bị trừ điểm?..."
+                  value={appealReason}
+                  onChange={(e) => setAppealReason(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowAppealModal(false)}
+                  disabled={submittingAppeal}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={submittingAppeal}
+                >
+                  {submittingAppeal ? 'Đang gửi...' : 'Xác nhận gửi khiếu nại'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CARD 6: AST & WINNOWING PLAGIARISM */}
       {submission.scoreReleased && (
         <div className="card" style={{ marginTop: '1rem' }}>
           <h3>AST & Winnowing Fingerprinting</h3>

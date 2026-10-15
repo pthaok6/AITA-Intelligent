@@ -3,6 +3,10 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
 import { MarkdownPreview } from '../../components/MarkdownPreview';
 
+const toLocalInput = (date: Date = new Date()) => {
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+};
+
 const POPULAR_TOPICS = [
   'Cây nhị phân tìm kiếm (BST)',
   'Thuật toán sắp xếp nhanh (QuickSort)',
@@ -23,6 +27,8 @@ export const CreateExamPage: React.FC = () => {
   const [examType, setExamType] = useState('INDIVIDUAL');
   const [timeLimitMs, setTimeLimitMs] = useState(2000);
   const [memoryLimitMb, setMemoryLimitMb] = useState(512);
+  const [startTime, setStartTime] = useState(() => toLocalInput(new Date()));
+  const [endTime, setEndTime] = useState(() => toLocalInput(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)));
 
   // Danh sách test case
   const [testCases, setTestCases] = useState<Array<{ inputData: string; expectedOutput: string; isHidden: boolean; scoreWeight: number }>>([
@@ -160,11 +166,25 @@ export const CreateExamPage: React.FC = () => {
       return;
     }
 
+    if (!startTime || !endTime) {
+      setError('Vui lòng chọn thời gian bắt đầu và kết thúc.');
+      return;
+    }
+
+    const startDate = new Date(startTime);
+    const endDate = new Date(endTime);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      setError('Định dạng thời gian không hợp lệ.');
+      return;
+    }
+
+    if (endDate.getTime() <= startDate.getTime()) {
+      setError('Thời gian kết thúc phải diễn ra sau thời gian bắt đầu.');
+      return;
+    }
+
     setSubmitting(true);
     setError('');
-
-    const startTime = new Date().toISOString();
-    const endTime = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 ngày sau
 
     const formattedTestCases = testCases.map((tc, idx) => ({
       ...tc,
@@ -181,8 +201,8 @@ export const CreateExamPage: React.FC = () => {
         examType,
         timeLimitMs: Number(timeLimitMs),
         memoryLimitMb: Number(memoryLimitMb),
-        startTime,
-        endTime,
+        startTime: startDate.toISOString(),
+        endTime: endDate.toISOString(),
         testCases: formattedTestCases,
       }),
     });
@@ -406,6 +426,31 @@ export const CreateExamPage: React.FC = () => {
                 className="form-control"
                 value={memoryLimitMb}
                 onChange={(e) => setMemoryLimitMb(Number(e.target.value))}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+            <div className="form-group">
+              <label htmlFor="exam-start-time">Thời gian bắt đầu</label>
+              <input
+                id="exam-start-time"
+                type="datetime-local"
+                className="form-control"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="exam-end-time">Thời gian kết thúc (Hạn nộp bài)</label>
+              <input
+                id="exam-end-time"
+                type="datetime-local"
+                className="form-control"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                required
               />
             </div>
           </div>

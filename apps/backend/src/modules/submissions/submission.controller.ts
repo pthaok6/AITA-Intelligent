@@ -26,7 +26,7 @@ submissionRouter.post('/exams/:examId/submissions', authenticateJwt,
 async function authorizedSubmission(req: AuthRequest) {
   const submission = await submissionService.getSubmission(String(req.params.id));
   if (submission.studentId !== req.user!.userId) await classAccess(submission.exam.classId, req.user!, true);
-  else if (await submissionService.getLatestSubmissionId(submission.examId, req.user!.userId) !== submission.id) throw new HttpError(404, 'KhÃ´ng tÃ¬m tháº¥y bÃ i ná»™p hiá»‡n hÃ nh.');
+  else if (await submissionService.getLatestSubmissionId(submission.examId, req.user!.userId) !== submission.id) throw new HttpError(404, 'Không tìm thấy bài nộp hiện hành.');
   return submission;
 }
 submissionRouter.get('/submissions/:id/archive', authenticateJwt, asyncRoute(async (req: AuthRequest, res, next) => {

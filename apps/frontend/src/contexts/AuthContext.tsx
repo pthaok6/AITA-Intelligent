@@ -24,10 +24,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     window.addEventListener('aita-session-expired', expired);
     window.addEventListener('aita-session-refreshed', refreshed);
-    void apiRequest<User>('/auth/me').then(result => {
-      if (active) { setUser(result.success ? result.data || null : null); setLoading(false); }
-    });
-    return () => { active = false; window.removeEventListener('aita-session-expired', expired); window.removeEventListener('aita-session-refreshed', refreshed); };
+
+    const safetyTimer = setTimeout(() => {
+      if (active) setLoading(false);
+    }, 2500);
+
+    void apiRequest<User>('/auth/me')
+      .then(result => {
+        if (active) {
+          setUser(result.success ? result.data || null : null);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setUser(null);
+          setLoading(false);
+        }
+      })
+      .finally(() => {
+        clearTimeout(safetyTimer);
+      });
+
+    return () => {
+      active = false;
+      clearTimeout(safetyTimer);
+      window.removeEventListener('aita-session-expired', expired);
+      window.removeEventListener('aita-session-refreshed', refreshed);
+    };
   }, []);
   const login = useCallback((newToken: string, newUser: User) => { setToken(newToken); setUser(newUser); }, []);
   const logout = async () => {

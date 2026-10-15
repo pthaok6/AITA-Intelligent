@@ -45,9 +45,14 @@ export const StudentDashboard: React.FC = () => {
 
   return (
     <div className="container">
-      <div style={{ marginBottom: '1.5rem' }}>
-        <h2>Cổng Luyện Tập & Nộp Bài Sinh Viên</h2>
-        <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Chọn bài thi thực hành được giao để làm bài và nhận kết quả chấm tự động tức thì</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <h2>Cổng Luyện Tập & Nộp Bài Sinh Viên</h2>
+          <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Chọn bài thi thực hành được giao để làm bài và nhận kết quả chấm tự động tức thì</p>
+        </div>
+        <Link to="/student/appeals" className="btn btn-secondary">
+          ⚖️ Đơn khiếu nại điểm của tôi
+        </Link>
       </div>
 
       {user?.role === 'STUDENT' && <form onSubmit={joinClass} className="card" style={{ display: 'flex', gap: '0.75rem', alignItems: 'end', marginBottom: '1.5rem' }}>
@@ -85,12 +90,25 @@ export const StudentDashboard: React.FC = () => {
                   {cls.exams.map((exam: any) => (
                     <div key={exam.id} style={{ background: '#090d16', border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem' }}>
                       <h4 style={{ marginBottom: '0.5rem' }}>{exam.title}</h4>
-                      <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.75rem' }}>
+                      <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.25rem' }}>
                         Ngôn ngữ: <strong style={{ color: '#60a5fa' }}>{exam.allowedLanguage}</strong> • CPU: {exam.timeLimitMs}ms
                       </p>
-                      <Link to={`/student/exams/${exam.id}/take`} className="btn btn-primary" style={{ width: '100%' }}>
-                        Vào nộp bài &rarr;
-                      </Link>
+                      <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: '0.75rem' }}>
+                        📅 Hạn nộp: <strong style={{ color: '#e2e8f0' }}>{new Date(exam.endTime).toLocaleString('vi-VN')}</strong>
+                      </p>
+                      {new Date() < new Date(exam.startTime) ? (
+                        <button disabled className="btn btn-secondary" style={{ width: '100%', opacity: 0.6 }}>
+                          Chưa mở (bắt đầu {new Date(exam.startTime).toLocaleString('vi-VN')})
+                        </button>
+                      ) : new Date() >= new Date(exam.endTime) ? (
+                        <button disabled className="btn btn-secondary" style={{ width: '100%', opacity: 0.6 }}>
+                          Đã hết hạn nộp
+                        </button>
+                      ) : (
+                        <Link to={`/student/exams/${exam.id}/take`} className="btn btn-primary" style={{ width: '100%' }}>
+                          Vào nộp bài &rarr;
+                        </Link>
+                      )}
                       <Link to={`/student/exams/${exam.id}/submissions`} className="btn btn-secondary" style={{ width: '100%', marginTop: '0.5rem' }}>Lịch sử bài nộp</Link>
                     </div>
                   ))}

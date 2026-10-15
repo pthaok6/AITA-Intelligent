@@ -63,7 +63,6 @@ export const ExamTakePage: React.FC = () => {
     if (res.success) navigate('/student/submissions/' + res.data.id);
     else setError(res.message || 'Không nộp được bài.');
   }
-
   return (
     <div className="container" style={{ maxWidth: 1000 }}>
       <Link to="/student">← Danh sách bài tập</Link>
@@ -79,6 +78,9 @@ export const ExamTakePage: React.FC = () => {
             )}
             <h2>{exam.title}</h2>
             <p>{exam.timeLimitMs} ms · {exam.memoryLimitMb} MiB</p>
+            <div style={{ margin: '0.75rem 0', padding: '0.5rem 0.75rem', background: '#090d16', border: '1px solid var(--border)', borderRadius: '0.375rem', fontSize: '0.85rem', color: '#94a3b8' }}>
+              ⏰ Thời gian: <strong style={{ color: '#60a5fa' }}>{new Date(exam.startTime).toLocaleString('vi-VN')}</strong> — <strong style={{ color: '#f87171' }}>{new Date(exam.endTime).toLocaleString('vi-VN')}</strong>
+            </div>
             <MarkdownPreview content={exam.descriptionMd} />
             <h3>Test case công khai</h3>
             {exam.testCases?.map((tc: any, index: number) => (
