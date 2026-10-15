@@ -71,10 +71,12 @@ export class GitAnalyticsService {
 
     let gitStats: Record<string, { commits: number; additions: number; deletions: number }> = {};
     const parsed = team.repoUrl ? this.parseRepoOwnerAndName(team.repoUrl) : null;
+    let gitFetchSuccess = false;
 
     if (parsed) {
       try {
         gitStats = await this.fetchGitHubStats(parsed.owner, parsed.repo);
+        gitFetchSuccess = Object.keys(gitStats).length > 0;
       } catch (error: any) {
         console.warn(`[GitAnalytics] Không thể tải dữ liệu từ GitHub (${error.message}). Tạo số liệu mô phỏng dự phòng.`);
       }
@@ -83,14 +85,23 @@ export class GitAnalyticsService {
     // Map stats to members
     const memberRecords = members.map((m, index) => {
       const username = m.githubUsername?.trim().toLowerCase();
-      const stats = username && gitStats[username]
-        ? gitStats[username]
-        : {
-            // Realistic deterministic spread for defense/demo if git repo has no commits or offline
-            commits: Math.max(1, (index === 0 ? 12 : index === 1 ? 8 : index === 2 ? 5 : 1)),
-            additions: Math.max(10, (index === 0 ? 320 : index === 1 ? 180 : index === 2 ? 90 : 8)),
-            deletions: Math.max(2, (index === 0 ? 45 : index === 1 ? 25 : index === 2 ? 10 : 2)),
-          };
+      let stats = { commits: 0, additions: 0, deletions: 0 };
+
+      if (gitFetchSuccess) {
+        // When real GitHub data is fetched: if student has no commits on repo, stats must be 0!
+        if (username && gitStats[username]) {
+          stats = gitStats[username];
+        } else {
+          stats = { commits: 0, additions: 0, deletions: 0 };
+        }
+      } else {
+        // Fallback simulated spread if offline or mock repo
+        stats = {
+          commits: Math.max(1, (index === 0 ? 12 : index === 1 ? 8 : index === 2 ? 5 : 1)),
+          additions: Math.max(10, (index === 0 ? 320 : index === 1 ? 180 : index === 2 ? 90 : 8)),
+          deletions: Math.max(2, (index === 0 ? 45 : index === 1 ? 25 : index === 2 ? 10 : 2)),
+        };
+      }
 
       const activityWeight = stats.additions + stats.deletions + stats.commits * 10;
       return {
@@ -102,7 +113,7 @@ export class GitAnalyticsService {
       };
     });
 
-    const totalTeamActivity = memberRecords.reduce((sum, r) => sum + r.activityWeight, 0) || 1;
+    const totalTeamActivity = memberRecords.reduce((sum, r) => sum + r.activityWeight, 0);
 
     // Latest team submission score
     const latestSubmission = team.submissions && team.submissions.length > 0 ? team.submissions[0] : null;
@@ -114,7 +125,9 @@ export class GitAnalyticsService {
     const results: MemberStats[] = [];
 
     for (const rec of memberRecords) {
-      const contributionPercent = Math.round((rec.activityWeight / totalTeamActivity) * 1000) / 10; // e.g. 35.5%
+      const contributionPercent = totalTeamActivity > 0
+        ? Math.round((rec.activityWeight / totalTeamActivity) * 1000) / 10 // e.g. 35.5%
+        : 0.0;
 
       // BR-05: Warning if contribution is below 5%
       const isWarning = contributionPercent < 5.0;
