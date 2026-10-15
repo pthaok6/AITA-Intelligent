@@ -2,7 +2,7 @@
 
 AITA là web quản lý lớp, bài kiểm tra và bài nộp lập trình. Frontend dùng React/Vite; backend dùng Express, Prisma/PostgreSQL, Redis/BullMQ và Docker Engine API.
 
-Hiện đã có đăng nhập JWT/Google, import sinh viên Excel bằng transaction, nộp ZIP, chấm test case bằng Docker thật và phân tích AST/Winnowing. Sinh viên tham gia lớp, nộp bài và xem lịch sử/kết quả. Giảng viên quản lý lớp, roster, đề thi/test case và xem báo cáo tương đồng. ADMIN quản lý tài khoản, vai trò và trạng thái hoạt động. Kết quả được cập nhật bằng polling. LLM review, Tree Edit Distance, WebSocket và khiếu nại điểm chưa được triển khai trong luồng này.
+Hiện đã có đăng nhập JWT/Google, import sinh viên Excel bằng transaction, nộp ZIP, chấm test case bằng Docker thật, phân tích đạo văn AST/Winnowing và phân tích đóng góp nhóm Git. Đã hoàn thiện và tích hợp đầy đủ **Phân hệ 3 (GenAI Core & Review Hub)**: Giảng viên có trợ lý AI tự động soạn đề bài lập trình, AI tự sinh barem điểm chuẩn 10.0 điểm, tích hợp Semantic Code Review chấm điểm Clean Code theo nguyên lý SOLID/Code Smells và AI tự động giải nghĩa lỗi biên dịch bằng ngôn ngữ tự nhiên kèm hướng dẫn sửa lỗi từng bước cho sinh viên. Hệ thống hỗ trợ xoay vòng đa API Key (Gemini/OpenAI) và cơ chế Fallback Engine thông minh đảm bảo vận hành ổn định 100%. Kết quả được cập nhật tự động.
 
 ## 1. Chuẩn bị
 
@@ -318,6 +318,12 @@ Mọi route dưới đây cần đăng nhập và kiểm tra quyền. Request gh
 | `POST /api/exams/:examId/submissions` | Multipart `file=<ZIP>`, `entrypoint=<optional>`; JSON `sourceCode` cũ không còn dùng trên HTTP |
 | `GET /api/submissions/:id` | Metadata, điểm, compiler diagnostics, test results và số fingerprint |
 | `GET /api/submissions/:id/archive` | Tải ZIP với kiểm tra chủ bài/giảng viên |
+| `POST /api/ai/generate-exam` | Lecturer/Admin: AI tự động soạn đề bài Markdown, sinh bộ test cases và cấu hình barem điểm 10.0 |
+| `POST /api/ai/generate-rubric` | Lecturer/Admin: AI tự sinh barem điểm chuẩn hóa theo chuẩn đầu ra |
+| `POST /api/ai/review-submission/:id` | Kích hoạt Semantic Code Review: chấm điểm Clean Code, phân tích SOLID và phát hiện code smells |
+| `POST /api/ai/explain-error` | AI Giải nghĩa lỗi biên dịch bằng tiếng Việt kèm checklist các bước sửa và đoạn code mẫu |
+| `GET /api/ai/reviews/:submissionId` | Lấy danh sách kết quả AI Review của bài nộp |
+| `GET /api/ai/config-status` | Kiểm tra tình trạng sẵn sàng của Gemini, OpenAI và Key Pool |
 | `GET /api/submissions/:id/fingerprints` | Tối đa 1000 fingerprint; trả tổng số và hash dạng string |
 | `GET /api/exams/:examId/plagiarism` | Báo cáo cặp bài; chỉ giảng viên sở hữu lớp/admin |
 

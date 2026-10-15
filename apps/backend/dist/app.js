@@ -15,6 +15,8 @@ const class_controller_1 = require("./modules/classes/class.controller");
 const exam_controller_1 = require("./modules/exams/exam.controller");
 const submission_controller_1 = require("./modules/submissions/submission.controller");
 const admin_controller_1 = require("./modules/auth/admin.controller");
+const team_controller_1 = require("./modules/teams/team.controller");
+const ai_controller_1 = require("./modules/ai/ai.controller");
 exports.app = (0, express_1.default)();
 exports.app.use((0, cors_1.default)({ credentials: true, origin: (origin, callback) => {
         if (!origin || (0, config_1.allowedOrigins)().includes(origin))
@@ -38,7 +40,9 @@ exports.app.use('/api/admin', admin_controller_1.adminRouter);
 exports.app.use('/api/classes', roster_import_controller_1.rosterImportRouter);
 exports.app.use('/api/classes', class_controller_1.classRouter);
 exports.app.use('/api/exams', exam_controller_1.examRouter);
+exports.app.use('/api', team_controller_1.teamRouter);
 exports.app.use('/api', submission_controller_1.submissionRouter);
+exports.app.use('/api/ai', ai_controller_1.aiRouter);
 exports.app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'ok', service: 'AITA Backend API', time: new Date().toISOString() });
 });

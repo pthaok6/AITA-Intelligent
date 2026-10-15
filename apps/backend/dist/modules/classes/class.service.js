@@ -44,6 +44,11 @@ class ClassService {
         return cls;
     }
     async dropStudent(classId, studentId) { return this.classRepo.dropStudent(classId, studentId); }
+    async removeStudentFromClass(classId, studentId) {
+        const result = await this.classRepo.removeStudentFromClass(classId, studentId);
+        if (result.count === 0)
+            throw new Error('Sinh viên không còn trong lớp này.');
+    }
     async getMyClasses(userId, role) {
         if (role === 'STUDENT') {
             return this.classRepo.findStudentClasses(userId);

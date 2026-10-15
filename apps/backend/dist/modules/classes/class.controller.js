@@ -104,8 +104,8 @@ exports.classRouter.delete('/:id/enroll', auth_middleware_1.authenticateJwt, (0,
 exports.classRouter.delete('/:id/students/:studentId', auth_middleware_1.authenticateJwt, (0, auth_middleware_1.requireRoles)(enums_1.UserRole.LECTURER, enums_1.UserRole.ADMIN), async (req, res) => {
     try {
         await (0, class_access_1.classAccess)(String(req.params.id), req.user, true);
-        await class_service_1.classService.dropStudent(String(req.params.id), String(req.params.studentId));
-        res.json({ success: true, message: 'Đã chuyển sinh viên sang trạng thái rời lớp.' });
+        await class_service_1.classService.removeStudentFromClass(String(req.params.id), String(req.params.studentId));
+        res.json({ success: true, message: 'Đã xóa sinh viên khỏi lớp.' });
     }
     catch (error) {
         res.status(error.status || 400).json({ success: false, message: error.message });

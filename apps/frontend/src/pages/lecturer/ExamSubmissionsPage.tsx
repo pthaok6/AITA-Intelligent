@@ -625,7 +625,8 @@ export const ExamSubmissionsPage: React.FC = () => {
                     <th>Sinh viên / Nhóm</th>
                     <th>Thời điểm nộp</th>
                     <th>Trạng thái</th>
-                    <th>Tổng điểm nhóm</th>
+                    <th>Điểm Test Cases</th>
+                    <th>Clean Code (AI)</th>
                     <th>AST</th>
                     <th>Thao tác</th>
                   </tr>
@@ -640,12 +641,21 @@ export const ExamSubmissionsPage: React.FC = () => {
                       </td>
                       <td>{formatDate(sub.submittedAt)}</td>
                       <td>
-                        <span className={`badge ${sub.status === 'COMPLETED' ? 'badge-green' : sub.status === 'RUNNING' ? 'badge-yellow' : 'badge-blue'}`}>
+                        <span className={`badge ${sub.status === 'COMPLETED' ? 'badge-green' : sub.status === 'COMPILE_ERROR' ? 'badge-red' : sub.status === 'RUNNING' ? 'badge-yellow' : 'badge-blue'}`}>
                           {sub.status}
                         </span>
                       </td>
                       <td style={{ fontWeight: 600, fontSize: '1.05rem', color: '#34d399' }}>
                         {sub.totalScore} pts
+                      </td>
+                      <td>
+                        {sub.aiReviews?.[0] ? (
+                          <span className={`badge ${sub.aiReviews[0].cleanCodeScore >= 8.5 ? 'badge-green' : sub.aiReviews[0].cleanCodeScore >= 7.0 ? 'badge-blue' : sub.aiReviews[0].cleanCodeScore >= 5.0 ? 'badge-yellow' : 'badge-red'}`}>
+                            ✨ {sub.aiReviews[0].cleanCodeScore}/10
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Chưa review</span>
+                        )}
                       </td>
                       <td>{sub.astStatus}</td>
                       <td>

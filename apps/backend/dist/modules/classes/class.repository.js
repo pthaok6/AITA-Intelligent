@@ -58,6 +58,9 @@ class ClassRepository {
     async dropStudent(classId, studentId) {
         return prisma_1.prisma.classEnrollment.update({ where: { classId_studentId: { classId, studentId } }, data: { status: 'DROPPED' } });
     }
+    async removeStudentFromClass(classId, studentId) {
+        return prisma_1.prisma.classEnrollment.deleteMany({ where: { classId, studentId } });
+    }
     async findStudentClasses(studentId) {
         const enrollments = await prisma_1.prisma.classEnrollment.findMany({
             where: { studentId, status: 'ACTIVE' },

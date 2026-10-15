@@ -3,6 +3,16 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
 import { MarkdownPreview } from '../../components/MarkdownPreview';
 
+const POPULAR_TOPICS = [
+  'Cây nhị phân tìm kiếm (BST)',
+  'Thuật toán sắp xếp nhanh (QuickSort)',
+  'Quy hoạch động Cái túi (0-1 Knapsack)',
+  'Đồ thị Dijkstra / Đường đi ngắn nhất',
+  'Ngăn xếp & Hàng đợi (Stack / Queue)',
+  'Danh sách liên kết (Linked List)',
+  'Kỹ thuật Hai con trỏ (Two Pointers)',
+];
+
 export const CreateExamPage: React.FC = () => {
   const { classId } = useParams<{ classId: string }>();
   const navigate = useNavigate();
@@ -23,8 +33,24 @@ export const CreateExamPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  // AI Generator States
+  const [aiTopic, setAiTopic] = useState('Cây nhị phân tìm kiếm (BST)');
+  const [aiDifficulty, setAiDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD'>('MEDIUM');
+  const [aiTestCount, setAiTestCount] = useState(5);
+  const [aiRequirements, setAiRequirements] = useState('');
+  const [generatingAi, setGeneratingAi] = useState(false);
+  const [generatingRubric, setGeneratingRubric] = useState(false);
+  const [aiSuccessMessage, setAiSuccessMessage] = useState('');
+  const [aiStatus, setAiStatus] = useState<{ geminiAvailable: boolean; openaiAvailable: boolean } | null>(null);
+
+  React.useEffect(() => {
+    apiRequest('/ai/config-status').then(res => {
+      if (res.success && res.data) setAiStatus(res.data);
+    });
+  }, []);
+
   const addTestCaseRow = () => {
-    setTestCases([...testCases, { inputData: '', expectedOutput: '', isHidden: false, scoreWeight: 2.5 }]);
+    setTestCases([...testCases, { inputData: '', expectedOutput: '', isHidden: false, scoreWeight: 2.0 }]);
   };
 
   const removeTestCaseRow = (index: number) => {
@@ -35,6 +61,96 @@ export const CreateExamPage: React.FC = () => {
     const updated = [...testCases];
     (updated[index] as any)[field] = value;
     setTestCases(updated);
+  };
+
+  // AI Trigger: Tự động soạn đề thi & bộ testcase kèm barem điểm
+  const handleAiGenerateExam = async () => {
+    if (!aiTopic.trim()) {
+      setError('Vui lòng nhập hoặc chọn chủ đề bài toán để AI soạn đề.');
+      return;
+    }
+    setGeneratingAi(true);
+    setError('');
+    setAiSuccessMessage('');
+
+    try {
+      const res = await apiRequest('/ai/generate-exam', {
+        method: 'POST',
+        body: JSON.stringify({
+          topic: aiTopic,
+          difficulty: aiDifficulty,
+          language: allowedLanguage,
+          testCaseCount: aiTestCount,
+          additionalRequirements: aiRequirements.trim() || undefined,
+        }),
+      });
+
+      if (res.success && res.data) {
+        setTitle(res.data.title);
+        setDescriptionMd(res.data.descriptionMd);
+        setTimeLimitMs(res.data.timeLimitMs || 2000);
+        setMemoryLimitMb(res.data.memoryLimitMb || 512);
+        if (Array.isArray(res.data.testCases) && res.data.testCases.length > 0) {
+          setTestCases(
+            res.data.testCases.map((tc: any) => ({
+              inputData: tc.inputData,
+              expectedOutput: tc.expectedOutput,
+              isHidden: Boolean(tc.isHidden),
+              scoreWeight: tc.scoreWeight || 2.0,
+            }))
+          );
+        }
+        setAiSuccessMessage(`✨ AI đã soạn thành công đề bài "${res.data.title}" kèm Barem điểm và ${res.data.testCases.length} test cases! Bạn có thể xem trước và tinh chỉnh bên dưới.`);
+      } else {
+        setError(res.message || 'Không thể sinh đề bài bằng AI.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Lỗi kết nối khi gọi AI.');
+    } finally {
+      setGeneratingAi(false);
+    }
+  };
+
+  // AI Trigger: Tự sinh lại Barem điểm cho đề hiện tại
+  const handleAiGenerateRubric = async () => {
+    if (!title.trim() && !descriptionMd.trim()) {
+      setError('Vui lòng nhập tiêu đề hoặc nội dung đề bài trước khi sinh barem điểm.');
+      return;
+    }
+    setGeneratingRubric(true);
+    setError('');
+    setAiSuccessMessage('');
+
+    try {
+      const res = await apiRequest('/ai/generate-rubric', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: title || aiTopic,
+          descriptionMd: descriptionMd || `Bài toán ${aiTopic}`,
+          language: allowedLanguage,
+          maxScore: 10.0,
+        }),
+      });
+
+      if (res.success && res.data) {
+        // Replace existing rubric section if present or append
+        let newDesc = descriptionMd;
+        const rubricHeaderIndex = newDesc.indexOf('### BAREM ĐIỂM');
+        if (rubricHeaderIndex !== -1) {
+          newDesc = newDesc.substring(0, rubricHeaderIndex).trim() + '\n\n' + res.data.rubricMarkdown;
+        } else {
+          newDesc = newDesc.trim() + '\n\n' + res.data.rubricMarkdown;
+        }
+        setDescriptionMd(newDesc);
+        setAiSuccessMessage('📋 AI đã sinh Barem điểm chuẩn 10.0 điểm và cập nhật vào cuối nội dung đề bài!');
+      } else {
+        setError(res.message || 'Không thể sinh barem điểm.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Lỗi kết nối khi sinh barem.');
+    } finally {
+      setGeneratingRubric(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -80,13 +196,142 @@ export const CreateExamPage: React.FC = () => {
   };
 
   return (
-    <div className="container" style={{ maxWidth: '800px' }}>
+    <div className="container" style={{ maxWidth: '900px' }}>
       <div style={{ marginBottom: '1rem' }}>
         <Link to="/lecturer">← Quay lại Dashboard</Link>
       </div>
 
+      {/* SECTION: AI EXAM & RUBRIC GENERATOR HUB */}
+      <div className="ai-panel">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
+              <span className="ai-badge">GENAI CORE · PHÂN HỆ 3</span>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#f8fafc' }}>
+                ✨ AI Soạn Đề Bài & Tự Sinh Barem Điểm
+              </h3>
+            </div>
+            <p style={{ margin: '0 0 0.5rem', fontSize: '0.875rem', color: '#cbd5e1' }}>
+              Tự động hóa toàn diện: Nhập chủ đề, AI sẽ tạo đề bài Markdown chi tiết, sinh bảng Barem điểm 10.0 và thiết lập sẵn bộ test cases chuẩn xác.
+            </p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {aiStatus?.geminiAvailable ? (
+                <span style={{ fontSize: '0.75rem', color: '#34d399', background: 'rgba(16, 185, 129, 0.15)', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid rgba(16, 185, 129, 0.4)', fontWeight: 600 }}>
+                  🟢 Đang chạy LLM thật: Google Gemini API (Online)
+                </span>
+              ) : aiStatus?.openaiAvailable ? (
+                <span style={{ fontSize: '0.75rem', color: '#34d399', background: 'rgba(16, 185, 129, 0.15)', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid rgba(16, 185, 129, 0.4)', fontWeight: 600 }}>
+                  🟢 Đang chạy LLM thật: OpenAI GPT-4o API (Online)
+                </span>
+              ) : (
+                <span style={{ fontSize: '0.75rem', color: '#fbbf24', background: 'rgba(245, 158, 11, 0.15)', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid rgba(245, 158, 11, 0.4)' }}>
+                  🟠 Chế độ: Local Fallback Engine (Offline) · Để gọi Gemini trực tiếp, điền GEMINI_API_KEY vào apps/backend/.env
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Topic Chips */}
+        <div style={{ marginBottom: '1rem' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Gợi ý chủ đề thuật toán nhanh:
+          </span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.4rem' }}>
+            {POPULAR_TOPICS.map((topic) => (
+              <button
+                key={topic}
+                type="button"
+                className={`topic-chip ${aiTopic === topic ? 'active' : ''}`}
+                onClick={() => setAiTopic(topic)}
+              >
+                {topic}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Form controls for AI */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
+          <div>
+            <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '0.25rem' }}>Chủ đề bài toán</label>
+            <input
+              type="text"
+              className="form-control"
+              value={aiTopic}
+              onChange={(e) => setAiTopic(e.target.value)}
+              placeholder="Nhập chủ đề tùy ý..."
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '0.25rem' }}>Độ khó</label>
+            <select
+              className="form-control"
+              value={aiDifficulty}
+              onChange={(e) => setAiDifficulty(e.target.value as any)}
+            >
+              <option value="EASY">DỄ (Easy)</option>
+              <option value="MEDIUM">TRUNG BÌNH (Medium)</option>
+              <option value="HARD">KHÓ (Hard)</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '0.25rem' }}>Số lượng test case</label>
+            <select
+              className="form-control"
+              value={aiTestCount}
+              onChange={(e) => setAiTestCount(Number(e.target.value))}
+            >
+              <option value={3}>3 test cases (nhanh)</option>
+              <option value={5}>5 test cases (chuẩn FPT)</option>
+              <option value={7}>7 test cases (toàn diện)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '0.25rem' }}>
+            Yêu cầu bổ sung cho AI (tùy chọn)
+          </label>
+          <input
+            type="text"
+            className="form-control"
+            value={aiRequirements}
+            onChange={(e) => setAiRequirements(e.target.value)}
+            placeholder="Ví dụ: Cần bối cảnh logistics thực tế, yêu cầu xử lý mảng rỗng, độ phức tạp O(N log N)..."
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', border: 'none', fontWeight: 600 }}
+            disabled={generatingAi}
+            onClick={handleAiGenerateExam}
+          >
+            {generatingAi ? '⏳ AI đang soạn đề bài & test case...' : '✨ AI Soạn Đề Bài & Sinh Barem'}
+          </button>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ borderColor: '#6366f1', color: '#c7d2fe' }}
+            disabled={generatingRubric}
+            onClick={handleAiGenerateRubric}
+          >
+            {generatingRubric ? '⏳ AI đang sinh barem...' : '📋 AI Tự Sinh Lại Barem Điểm'}
+          </button>
+        </div>
+
+        {aiSuccessMessage && (
+          <div style={{ background: 'rgba(16, 185, 129, 0.2)', border: '1px solid #10b981', color: '#34d399', padding: '0.75rem 1rem', borderRadius: '0.5rem', marginTop: '1rem', fontSize: '0.9rem' }}>
+            {aiSuccessMessage}
+          </div>
+        )}
+      </div>
+
       <div className="card">
-        <h2 style={{ marginBottom: '1.5rem' }}>Tạo bài thi và bộ test case</h2>
+        <h2 style={{ marginBottom: '1.5rem' }}>Chi tiết đề thi & Cấu hình kiểm thử</h2>
 
         {error && (
           <div style={{ background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', color: '#f87171', padding: '0.75rem', borderRadius: '0.5rem', marginBottom: '1rem' }}>
@@ -108,28 +353,28 @@ export const CreateExamPage: React.FC = () => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="exam-description">Mô tả đề bài (Markdown)</label>
+            <label htmlFor="exam-description">Mô tả đề bài & Barem điểm (Markdown)</label>
             <div className="markdown-editor-preview">
               <div>
                 <span className="markdown-panel-title">Nội dung Markdown</span>
                 <textarea
                   id="exam-description"
                   className="form-control markdown-editor"
-                  rows={12}
-                  placeholder="# Mô tả bài toán\nCho hai số nguyên a và b trên cùng một dòng.\n\nIn ra tổng a + b."
+                  rows={14}
+                  placeholder="# Mô tả bài toán\nCho hai số nguyên a và b trên cùng một dòng.\n\nIn ra tổng a + b.\n\n### BAREM ĐIỂM (10 ĐIỂM)..."
                   value={descriptionMd}
                   onChange={(e) => setDescriptionMd(e.target.value)}
                   required
                 />
               </div>
               <section aria-label="Xem trước đề bài">
-                <span className="markdown-panel-title">Xem trước</span>
+                <span className="markdown-panel-title">Xem trước hiển thị</span>
                 <MarkdownPreview content={descriptionMd} />
               </section>
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1rem' }}>
             <div className="form-group">
               <label>Hình thức bài thi</label>
               <select className="form-control" value={examType} onChange={(e) => setExamType(e.target.value)}>
@@ -168,7 +413,12 @@ export const CreateExamPage: React.FC = () => {
           <hr style={{ borderColor: 'var(--border)', margin: '1.5rem 0' }} />
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h4>Bộ test case chấm điểm tự động</h4>
+            <div>
+              <h4 style={{ margin: 0 }}>Bộ test case chấm điểm tự động</h4>
+              <p style={{ margin: '0.2rem 0 0', fontSize: '0.8rem', color: '#94a3b8' }}>
+                Tổng điểm test cases: {testCases.reduce((sum, tc) => sum + (tc.scoreWeight || 0), 0).toFixed(1)} điểm
+              </p>
+            </div>
             <button type="button" onClick={addTestCaseRow} className="btn btn-secondary">
               + Thêm test case
             </button>
@@ -177,7 +427,9 @@ export const CreateExamPage: React.FC = () => {
           {testCases.map((tc, idx) => (
             <div key={idx} style={{ background: '#090d16', border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', marginBottom: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>Test case {idx + 1}</span>
+                <span style={{ fontWeight: 600, fontSize: '0.875rem', color: tc.isHidden ? '#f59e0b' : '#38bdf8' }}>
+                  Test case #{idx + 1} {tc.isHidden ? '(Test Ẩn)' : '(Công khai)'}
+                </span>
                 {testCases.length > 1 && (
                   <button type="button" className="btn btn-ghost-danger btn-sm" onClick={() => removeTestCaseRow(idx)}>
                     Xóa
@@ -186,9 +438,9 @@ export const CreateExamPage: React.FC = () => {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.5rem' }}>
                 <div>
-                  <label style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Dữ liệu đầu vào</label>
-                  <input
-                    type="text"
+                  <label style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Dữ liệu đầu vào (StdIn)</label>
+                  <textarea
+                    rows={2}
                     className="form-control"
                     placeholder="3 5"
                     value={tc.inputData}
@@ -197,9 +449,9 @@ export const CreateExamPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Kết quả mong đợi</label>
-                  <input
-                    type="text"
+                  <label style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Kết quả mong đợi (StdOut)</label>
+                  <textarea
+                    rows={2}
                     className="form-control"
                     placeholder="8"
                     value={tc.expectedOutput}
@@ -208,7 +460,7 @@ export const CreateExamPage: React.FC = () => {
                   />
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem' }}>
                   <input
                     type="checkbox"
@@ -218,11 +470,11 @@ export const CreateExamPage: React.FC = () => {
                   Test case ẩn (chỉ dùng để chấm điểm, không hiển thị cho sinh viên)
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Điểm:</span>
+                  <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Trọng số điểm:</span>
                   <input
                     type="number"
                     step="0.5"
-                    style={{ width: '70px' }}
+                    style={{ width: '80px' }}
                     className="form-control"
                     value={tc.scoreWeight}
                     onChange={(e) => updateTestCase(idx, 'scoreWeight', Number(e.target.value))}
@@ -232,8 +484,8 @@ export const CreateExamPage: React.FC = () => {
             </div>
           ))}
 
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }} disabled={submitting}>
-            {submitting ? 'Đang lưu đề thi...' : 'Lưu & Kích hoạt Bài Thi'}
+          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem', padding: '0.85rem', fontSize: '1rem' }} disabled={submitting}>
+            {submitting ? 'Đang lưu đề thi...' : '🚀 Lưu & Kích hoạt Bài Thi'}
           </button>
         </form>
       </div>

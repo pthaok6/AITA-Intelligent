@@ -5,6 +5,7 @@ import { dockerSandbox, DockerSandboxService } from '../../infrastructure/sandbo
 import { loadBundle, writeSandboxLog } from '../../infrastructure/storage/submission-archive';
 import { defaultJobQueue } from '../../infrastructure/queue/bullmq-job-queue';
 import { IJobQueue } from '../../infrastructure/queue/job-queue.interface';
+import { aiModuleService } from '../ai/ai.service';
 
 export class AutogradingService {
   constructor(private submissionRepo: SubmissionRepository = submissionRepository, private examRepo: ExamRepository = examRepository,
@@ -24,8 +25,11 @@ export class AutogradingService {
         await writeSandboxLog(submissionId, { stage: 'compile', ...prepared.compile });
         const compilation = prepared.compile;
         if (compilation.exitCode || compilation.timedOut || compilation.oom || compilation.outputTruncated) {
-          await this.submissionRepo.updateStatus(submissionId, 'COMPILE_ERROR', { completedAt: new Date(), totalScore: 0, compileMessage: (compilation.stderr + '\n' + compilation.stdout + (compilation.timedOut ? '\nCompiler exceeded 60s.' : '') + (compilation.oom ? '\nCompiler exceeded 512 MiB.' : '')).slice(0, 12000) });
-          await this.enqueueAst(submissionId); return;
+          const compileMsg = (compilation.stderr + '\n' + compilation.stdout + (compilation.timedOut ? '\nCompiler exceeded 60s.' : '') + (compilation.oom ? '\nCompiler exceeded 512 MiB.' : '')).slice(0, 12000);
+          await this.submissionRepo.updateStatus(submissionId, 'COMPILE_ERROR', { completedAt: new Date(), totalScore: 0, compileMessage: compileMsg });
+          await this.enqueueAst(submissionId);
+          void this.triggerAiReview(submissionId);
+          return;
         }
       }
       const results = [];
@@ -42,6 +46,7 @@ export class AutogradingService {
       await this.submissionRepo.saveTestResults(results);
       await this.submissionRepo.updateStatus(submissionId, 'COMPLETED', { completedAt: new Date(), totalScore: Math.round(totalScore * 100) / 100, compileMessage: prepared ? (prepared.compile.stderr + prepared.compile.stdout).slice(0, 12000) : '' });
       if (submission.artifactType === 'ZIP') await this.enqueueAst(submissionId);
+      void this.triggerAiReview(submissionId);
     } catch (error: any) {
       await this.submissionRepo.updateStatus(submissionId, 'FAILED', { completedAt: new Date(), compileMessage: error.message.slice(0, 4000) });
       await writeSandboxLog(submissionId, { stage: 'error', message: error.message });
@@ -51,6 +56,13 @@ export class AutogradingService {
   private async enqueueAst(submissionId: string) {
     try { await this.queue.addJob('plagiarism-queue', { submissionId }); }
     catch (error: any) { console.error('[AST enqueue pending]', submissionId, error.message); }
+  }
+  private async triggerAiReview(submissionId: string) {
+    try {
+      await aiModuleService.reviewSubmission(submissionId);
+    } catch (error: any) {
+      console.warn('[AI Review trigger pending]', submissionId, error.message);
+    }
   }
 }
 export const autogradingService = new AutogradingService();

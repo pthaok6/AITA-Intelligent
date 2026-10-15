@@ -28,9 +28,24 @@ class SubmissionService {
         const student = await prisma_1.prisma.user.findUnique({ where: { id: studentId } });
         if (!enrollment || enrollment.status !== 'ACTIVE' || student?.role !== 'STUDENT')
             throw new http_1.HttpError(403, 'Chỉ sinh viên đang học trong lớp được nộp bài.');
-        if (new Date() < exam.startTime || new Date() > exam.endTime)
+        if (new Date() < exam.startTime || new Date() >= exam.endTime)
             throw new http_1.HttpError(400, 'Bài thi chưa bắt đầu hoặc đã kết thúc.');
-        return exam;
+        let teamId = undefined;
+        if (exam.examType === 'GROUP') {
+            const team = await prisma_1.prisma.team.findFirst({
+                where: { examId, members: { some: { studentId } } },
+                include: { members: { where: { studentId } } },
+            });
+            if (!team) {
+                throw new http_1.HttpError(403, 'Bài thi này là bài tập nhóm. Bạn cần tham gia một nhóm trước khi nộp bài.');
+            }
+            const membership = team.members[0];
+            if (!membership || membership.role !== 'LEADER') {
+                throw new http_1.HttpError(403, 'Chỉ Trưởng nhóm (Team Leader) mới có quyền nộp bài cho nhóm (BR-11).');
+            }
+            teamId = team.id;
+        }
+        return { exam, teamId };
     }
     async enqueue(submission) {
         try {
@@ -45,16 +60,20 @@ class SubmissionService {
     async submitArchive(examId, studentId, bytes, filename, entrypoint) {
         if (entrypoint !== undefined && typeof entrypoint !== 'string')
             throw new http_1.HttpError(400, 'Entrypoint phải là chuỗi.');
-        const exam = await this.authorizeSubmission(examId, studentId);
+        const { exam, teamId } = await this.authorizeSubmission(examId, studentId);
         const bundle = (0, submission_archive_1.selectBundle)(await (0, submission_archive_1.readZip)(bytes), exam.allowedLanguage, entrypoint);
         const stored = await (0, submission_archive_1.persistArchive)(bytes);
-        const submission = await prisma_1.prisma.submission.create({ data: { examId, studentId, sourceCodeUrl: stored.key, fileHashSha256: stored.hash, artifactType: 'ZIP', originalFilename: filename.slice(0, 200), entrypoint: bundle.entrypoint, sourceFiles: bundle.files.map(f => ({ path: f.path, size: f.data.length })) } });
+        const submission = await this.submissionRepo.create({
+            examId, studentId, teamId, sourceCodeUrl: stored.key, fileHashSha256: stored.hash,
+            artifactType: 'ZIP', originalFilename: filename.slice(0, 200), entrypoint: bundle.entrypoint,
+            sourceFiles: bundle.files.map(file => ({ path: file.path, size: file.data.length })),
+        });
         return this.enqueue(submission);
     }
     // Compatibility for explicit mock tests only. The HTTP API accepts ZIP exclusively.
     async submitCode(examId, studentId, sourceCode) {
-        await this.authorizeSubmission(examId, studentId);
-        const submission = await this.submissionRepo.create({ examId, studentId, sourceCodeUrl: sourceCode, fileHashSha256: crypto_1.default.createHash('sha256').update(sourceCode).digest('hex'), artifactType: 'LEGACY_TEXT', astStatus: 'SKIPPED' });
+        const { teamId } = await this.authorizeSubmission(examId, studentId);
+        const submission = await this.submissionRepo.create({ examId, studentId, teamId, sourceCodeUrl: sourceCode, fileHashSha256: crypto_1.default.createHash('sha256').update(sourceCode).digest('hex'), artifactType: 'LEGACY_TEXT', astStatus: 'SKIPPED' });
         return this.enqueue(submission);
     }
     async getSubmission(id) {
@@ -62,6 +81,9 @@ class SubmissionService {
         if (!result)
             throw new http_1.HttpError(404, 'Không tìm thấy bài nộp.');
         return result;
+    }
+    async getLatestSubmissionId(examId, studentId) {
+        return (await this.submissionRepo.findLatestForStudent(examId, studentId))?.id;
     }
     async getSubmissionsByExam(examId, studentId) { return this.submissionRepo.findByExamId(examId, studentId); }
 }

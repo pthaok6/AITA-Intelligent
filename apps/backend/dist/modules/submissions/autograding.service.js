@@ -6,6 +6,7 @@ const exam_repository_1 = require("../exams/exam.repository");
 const docker_sandbox_service_1 = require("../../infrastructure/sandbox/docker-sandbox.service");
 const submission_archive_1 = require("../../infrastructure/storage/submission-archive");
 const bullmq_job_queue_1 = require("../../infrastructure/queue/bullmq-job-queue");
+const ai_service_1 = require("../ai/ai.service");
 class AutogradingService {
     submissionRepo;
     examRepo;
@@ -35,8 +36,10 @@ class AutogradingService {
                 await (0, submission_archive_1.writeSandboxLog)(submissionId, { stage: 'compile', ...prepared.compile });
                 const compilation = prepared.compile;
                 if (compilation.exitCode || compilation.timedOut || compilation.oom || compilation.outputTruncated) {
-                    await this.submissionRepo.updateStatus(submissionId, 'COMPILE_ERROR', { completedAt: new Date(), totalScore: 0, compileMessage: (compilation.stderr + '\n' + compilation.stdout + (compilation.timedOut ? '\nCompiler exceeded 60s.' : '') + (compilation.oom ? '\nCompiler exceeded 512 MiB.' : '')).slice(0, 12000) });
+                    const compileMsg = (compilation.stderr + '\n' + compilation.stdout + (compilation.timedOut ? '\nCompiler exceeded 60s.' : '') + (compilation.oom ? '\nCompiler exceeded 512 MiB.' : '')).slice(0, 12000);
+                    await this.submissionRepo.updateStatus(submissionId, 'COMPILE_ERROR', { completedAt: new Date(), totalScore: 0, compileMessage: compileMsg });
                     await this.enqueueAst(submissionId);
+                    void this.triggerAiReview(submissionId);
                     return;
                 }
             }
@@ -55,6 +58,7 @@ class AutogradingService {
             await this.submissionRepo.updateStatus(submissionId, 'COMPLETED', { completedAt: new Date(), totalScore: Math.round(totalScore * 100) / 100, compileMessage: prepared ? (prepared.compile.stderr + prepared.compile.stdout).slice(0, 12000) : '' });
             if (submission.artifactType === 'ZIP')
                 await this.enqueueAst(submissionId);
+            void this.triggerAiReview(submissionId);
         }
         catch (error) {
             await this.submissionRepo.updateStatus(submissionId, 'FAILED', { completedAt: new Date(), compileMessage: error.message.slice(0, 4000) });
@@ -68,6 +72,14 @@ class AutogradingService {
         }
         catch (error) {
             console.error('[AST enqueue pending]', submissionId, error.message);
+        }
+    }
+    async triggerAiReview(submissionId) {
+        try {
+            await ai_service_1.aiModuleService.reviewSubmission(submissionId);
+        }
+        catch (error) {
+            console.warn('[AI Review trigger pending]', submissionId, error.message);
         }
     }
 }

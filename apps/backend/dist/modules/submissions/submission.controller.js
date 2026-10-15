@@ -20,12 +20,17 @@ exports.submissionRouter.post('/exams/:examId/submissions', auth_middleware_1.au
     if (!req.file)
         throw new http_1.HttpError(400, 'Gửi ZIP ở trường file, dùng multipart/form-data.');
     const submission = await submission_service_1.submissionService.submitArchive(String(req.params.examId), req.user.userId, req.file.buffer, req.file.originalname, req.body.entrypoint);
-    res.status(201).json({ success: true, data: { ...submission, sourceCodeUrl: undefined } });
+    res.status(201).json({ success: true, data: {
+            id: submission.id, examId: submission.examId, submittedAt: submission.submittedAt,
+            status: submission.status, scoreReleased: false,
+        } });
 }));
 async function authorizedSubmission(req) {
     const submission = await submission_service_1.submissionService.getSubmission(String(req.params.id));
     if (submission.studentId !== req.user.userId)
         await (0, class_access_1.classAccess)(submission.exam.classId, req.user, true);
+    else if (await submission_service_1.submissionService.getLatestSubmissionId(submission.examId, req.user.userId) !== submission.id)
+        throw new http_1.HttpError(404, 'KhÃ´ng tÃ¬m tháº¥y bÃ i ná»™p hiá»‡n hÃ nh.');
     return submission;
 }
 exports.submissionRouter.get('/submissions/:id/archive', auth_middleware_1.authenticateJwt, (0, http_1.asyncRoute)(async (req, res, next) => {
@@ -38,23 +43,70 @@ exports.submissionRouter.get('/submissions/:id/archive', auth_middleware_1.authe
 exports.submissionRouter.get('/submissions/:id', auth_middleware_1.authenticateJwt, (0, http_1.asyncRoute)(async (req, res) => {
     const submission = await authorizedSubmission(req);
     const studentView = req.user.role === 'STUDENT';
+    const scoreReleased = !studentView || new Date() >= submission.exam.endTime;
+    if (studentView && !scoreReleased) {
+        const isCompileError = submission.status === 'COMPILE_ERROR';
+        res.json({ success: true, data: {
+                id: submission.id, examId: submission.examId, studentId: submission.studentId,
+                exam: submission.exam, student: submission.student, sourceFiles: submission.sourceFiles,
+                fileHashSha256: submission.fileHashSha256, artifactType: submission.artifactType,
+                originalFilename: submission.originalFilename, entrypoint: submission.entrypoint,
+                submittedAt: submission.submittedAt, status: submission.status,
+                scoreReleased: false, scoreReleaseAt: submission.exam.endTime,
+                totalScore: null,
+                compileMessage: isCompileError ? submission.compileMessage : null,
+                aiReviews: isCompileError ? submission.aiReviews : [],
+                testResults: [], astStatus: null,
+                astMessage: null, astVersion: null, astK: null, astW: null, _count: { fingerprints: 0 },
+            } });
+        return;
+    }
     res.json({ success: true, data: { ...submission, sourceCodeUrl: undefined,
+            scoreReleased,
+            aiReviews: submission.aiReviews || [],
+            astStatus: studentView ? null : submission.astStatus,
+            astMessage: studentView ? null : submission.astMessage,
+            astVersion: studentView ? null : submission.astVersion,
+            astK: studentView ? null : submission.astK,
+            astW: studentView ? null : submission.astW,
+            _count: studentView ? { fingerprints: 0 } : submission._count,
             testResults: submission.testResults.map(result => studentView && result.testCase.isHidden ? { ...result, actualOutput: null, stderr: null } : result) } });
 }));
 exports.submissionRouter.get('/exams/:examId/submissions', auth_middleware_1.authenticateJwt, (0, http_1.asyncRoute)(async (req, res) => {
     const exam = await exam_service_1.examService.getExamById(String(req.params.examId));
     const studentView = req.user.role === 'STUDENT';
     await (0, class_access_1.classAccess)(exam.classId, req.user, !studentView);
-    res.json({ success: true, data: (await submission_service_1.submissionService.getSubmissionsByExam(exam.id, studentView ? req.user.userId : undefined)).map(submission => ({ ...submission, sourceCodeUrl: undefined })) });
+    const submissions = await submission_service_1.submissionService.getSubmissionsByExam(exam.id, studentView ? req.user.userId : undefined);
+    const scoreReleased = !studentView || new Date() >= exam.endTime;
+    res.json({ success: true, data: submissions.map(submission => {
+            if (studentView && !scoreReleased)
+                return {
+                    id: submission.id, examId: submission.examId, studentId: submission.studentId,
+                    student: submission.student, submittedAt: submission.submittedAt, status: submission.status,
+                    scoreReleased: false, totalScore: null, astStatus: null, compileMessage: null,
+                    _count: { testResults: 0 },
+                };
+            if (studentView)
+                return {
+                    id: submission.id, examId: submission.examId, studentId: submission.studentId,
+                    student: submission.student, submittedAt: submission.submittedAt, status: submission.status,
+                    scoreReleased: true, totalScore: submission.totalScore,
+                };
+            return { ...submission, sourceCodeUrl: undefined, scoreReleased };
+        }) });
 }));
 exports.submissionRouter.get('/exams/:examId/plagiarism', auth_middleware_1.authenticateJwt, (0, http_1.asyncRoute)(async (req, res) => {
     const exam = await exam_service_1.examService.getExamById(String(req.params.examId));
     await (0, class_access_1.classAccess)(exam.classId, req.user, true);
-    const reports = await prisma_1.prisma.plagiarismReport.findMany({ where: { examId: exam.id }, orderBy: { similarityScore: 'desc' },
+    const latest = await submission_service_1.submissionService.getSubmissionsByExam(exam.id);
+    const latestIds = latest.map(submission => submission.id);
+    const reports = await prisma_1.prisma.plagiarismReport.findMany({ where: { examId: exam.id, submissionAId: { in: latestIds }, submissionBId: { in: latestIds } }, orderBy: { similarityScore: 'desc' },
         include: { submissionA: { select: { id: true, student: { select: { fullName: true, email: true } } } }, submissionB: { select: { id: true, student: { select: { fullName: true, email: true } } } } } });
     res.json({ success: true, data: reports });
 }));
 exports.submissionRouter.get('/submissions/:id/fingerprints', auth_middleware_1.authenticateJwt, (0, http_1.asyncRoute)(async (req, res) => {
+    if (req.user.role === 'STUDENT')
+        throw new http_1.HttpError(403, 'Báo cáo fingerprint chỉ dành cho giảng viên.');
     const submission = await authorizedSubmission(req);
     const fingerprints = await prisma_1.prisma.aSTFingerprint.findMany({ where: { submissionId: submission.id }, orderBy: [{ sourcePath: 'asc' }, { tokenStart: 'asc' }], take: 1000 });
     res.json({ success: true, data: { total: submission._count.fingerprints, limit: 1000, items: fingerprints.map(fp => ({ ...fp, hashValue: fp.hashValue.toString() })) } });

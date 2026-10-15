@@ -40,10 +40,11 @@ export class SubmissionRepository {
       where: { id },
       include: {
         _count: { select: { fingerprints: true } },
-        exam: { select: { id: true, title: true, allowedLanguage: true, classId: true, endTime: true, examType: true } },
+        exam: { select: { id: true, title: true, allowedLanguage: true, classId: true, endTime: true, examType: true, descriptionMd: true } },
         student: { select: { id: true, fullName: true, email: true } },
         team: { select: { id: true, name: true, repoUrl: true } },
         sourceFiles: { select: { path: true, size: true }, orderBy: { path: 'asc' } },
+        aiReviews: { orderBy: { reviewRound: 'desc' } },
         testResults: {
           include: { testCase: { select: { id: true, orderIndex: true, scoreWeight: true, isHidden: true } } },
           orderBy: { testCase: { orderIndex: 'asc' } },
@@ -57,6 +58,7 @@ export class SubmissionRepository {
       where: { examId, ...(studentId ? { studentId } : {}) },
       include: {
         student: { select: { id: true, fullName: true, email: true } },
+        aiReviews: { orderBy: { reviewRound: 'desc' }, take: 1 },
         _count: { select: { testResults: true } },
       },
       orderBy: { attemptNumber: 'desc' },

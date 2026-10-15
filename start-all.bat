@@ -11,8 +11,11 @@ if errorlevel 1 (
 
 where npm.cmd >nul 2>&1
 if errorlevel 1 (
-  echo [ERROR] Khong tim thay npm.cmd. Hay cai Node.js va npm truoc.
-  goto failed
+  where npm >nul 2>&1
+  if errorlevel 1 (
+    echo [ERROR] Khong tim thay npm hoac npm.cmd. Hay cai Node.js va npm truoc.
+    goto failed
+  )
 )
 
 if not exist ".env" (

@@ -39,6 +39,7 @@ submissionRouter.get('/submissions/:id', authenticateJwt, asyncRoute(async (req:
   const studentView = req.user!.role === 'STUDENT';
   const scoreReleased = !studentView || new Date() >= submission.exam.endTime;
   if (studentView && !scoreReleased) {
+    const isCompileError = submission.status === 'COMPILE_ERROR';
     res.json({ success: true, data: {
       id: submission.id, examId: submission.examId, studentId: submission.studentId,
       exam: submission.exam, student: submission.student, sourceFiles: submission.sourceFiles,
@@ -46,13 +47,17 @@ submissionRouter.get('/submissions/:id', authenticateJwt, asyncRoute(async (req:
       originalFilename: submission.originalFilename, entrypoint: submission.entrypoint,
       submittedAt: submission.submittedAt, status: submission.status,
       scoreReleased: false, scoreReleaseAt: submission.exam.endTime,
-      totalScore: null, compileMessage: null, testResults: [], astStatus: null,
+      totalScore: null,
+      compileMessage: isCompileError ? submission.compileMessage : null,
+      aiReviews: isCompileError ? submission.aiReviews : [],
+      testResults: [], astStatus: null,
       astMessage: null, astVersion: null, astK: null, astW: null, _count: { fingerprints: 0 },
     } });
     return;
   }
   res.json({ success: true, data: { ...submission, sourceCodeUrl: undefined,
     scoreReleased,
+    aiReviews: submission.aiReviews || [],
     astStatus: studentView ? null : submission.astStatus,
     astMessage: studentView ? null : submission.astMessage,
     astVersion: studentView ? null : submission.astVersion,
