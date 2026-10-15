@@ -3,7 +3,15 @@ import { useParams, Link } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 
-const formatDate = (value: string) => new Date(value).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+const formatDate = (value?: string) => {
+  if (!value) return '-';
+  try {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  } catch {
+    return '-';
+  }
+};
 
 export const ExamSubmissionsPage: React.FC = () => {
   const { classId } = useParams<{ classId: string }>();
@@ -205,7 +213,7 @@ export const ExamSubmissionsPage: React.FC = () => {
                           </button>
                         </div>
 
-                        {team.members.length === 0 ? (
+                        {(!team.members || team.members.length === 0) ? (
                           <p style={{ fontSize: '0.85rem', color: '#64748b' }}>Nhóm chưa có thành viên nào.</p>
                         ) : (
                           <table className="table" style={{ fontSize: '0.875rem' }}>
@@ -221,13 +229,13 @@ export const ExamSubmissionsPage: React.FC = () => {
                               </tr>
                             </thead>
                             <tbody>
-                              {team.members.map((m: any) => {
+                              {(team.members || []).map((m: any) => {
                                 const contrib = m.contributions?.[0];
                                 return (
                                   <tr key={m.id}>
                                     <td>
-                                      <strong>{m.student?.fullName}</strong>
-                                      <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{m.student?.email}</div>
+                                      <strong>{m.student?.fullName || 'Sinh viên'}</strong>
+                                      <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{m.student?.email || ''}</div>
                                     </td>
                                     <td>
                                       <span className={`badge ${m.role === 'LEADER' ? 'badge-yellow' : 'badge-blue'}`}>
@@ -255,8 +263,8 @@ export const ExamSubmissionsPage: React.FC = () => {
                                         <span className="badge badge-green">Đạt yêu cầu</span>
                                       ) : '-'}
                                     </td>
-                                    <td style={{ fontWeight: 'bold', fontSize: '1rem', color: contrib?.personalScore !== null ? '#34d399' : '#94a3b8' }}>
-                                      {contrib?.personalScore !== null ? `${contrib.personalScore} pts` : latestSub?.status === 'COMPLETED' ? 'Bấm đồng bộ để tính' : 'Chờ chấm bài nhóm'}
+                                    <td style={{ fontWeight: 'bold', fontSize: '1rem', color: (contrib && contrib.personalScore != null) ? '#34d399' : '#94a3b8' }}>
+                                      {(contrib && contrib.personalScore != null) ? `${contrib.personalScore} pts` : latestSub?.status === 'COMPLETED' ? 'Bấm đồng bộ để tính' : 'Chờ chấm bài nhóm'}
                                     </td>
                                   </tr>
                                 );
@@ -292,9 +300,9 @@ export const ExamSubmissionsPage: React.FC = () => {
                   {submissions.map((sub) => (
                     <tr key={sub.id}>
                       <td>
-                        <strong>{sub.student?.fullName}</strong>
+                        <strong>{sub.student?.fullName || 'Sinh viên'}</strong>
                         {sub.team && <div style={{ fontSize: '0.8rem', color: '#38bdf8' }}>👥 Nhóm: {sub.team.name}</div>}
-                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{sub.student?.email}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{sub.student?.email || ''}</div>
                       </td>
                       <td>{formatDate(sub.submittedAt)}</td>
                       <td>
@@ -322,8 +330,8 @@ export const ExamSubmissionsPage: React.FC = () => {
             {!reports.length ? <p>Chưa có cặp bài hoàn tất phân tích. Báo cáo tự cập nhật sau khi worker xử lý.</p> : <table className="table">
               <thead><tr><th>Bài A</th><th>Bài B</th><th>Tương đồng</th><th>Hash chung</th><th>Mức đánh dấu</th></tr></thead>
               <tbody>{reports.map(report => <tr key={report.id}>
-                <td><Link to={`/student/submissions/${report.submissionAId}`}>{report.submissionA.student.fullName}</Link><div>{report.submissionAId.slice(0, 8)}</div></td>
-                <td><Link to={`/student/submissions/${report.submissionBId}`}>{report.submissionB.student.fullName}</Link><div>{report.submissionBId.slice(0, 8)}</div></td>
+                <td><Link to={`/student/submissions/${report.submissionAId}`}>{report.submissionA?.student?.fullName || report.submissionAId?.slice(0, 8)}</Link><div>{report.submissionAId?.slice(0, 8)}</div></td>
+                <td><Link to={`/student/submissions/${report.submissionBId}`}>{report.submissionB?.student?.fullName || report.submissionBId?.slice(0, 8)}</Link><div>{report.submissionBId?.slice(0, 8)}</div></td>
                 <td>{report.similarityScore.toFixed(2)}%</td><td>{report.matchedHashesCount}</td><td>{report.status}</td>
               </tr>)}</tbody>
             </table>}
