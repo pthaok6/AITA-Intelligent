@@ -111,6 +111,15 @@ export class TeamService {
     return team;
   }
 
+  async deleteTeam(teamId: string) {
+    const team = await this.teamRepo.findTeamById(teamId);
+    if (!team) throw new HttpError(404, 'Không tìm thấy nhóm.');
+    const submissionsCount = await prisma.submission.count({ where: { teamId } });
+    if (submissionsCount > 0) throw new HttpError(400, 'Không thể xóa nhóm đã có bài nộp.');
+    await prisma.team.delete({ where: { id: teamId } });
+    return { message: 'Đã xóa nhóm thành công.' };
+  }
+
   async syncGitAnalytics(teamId: string, options?: { lowerBound?: number; upperBound?: number }) {
     return this.gitAnalytics.syncTeamContributions(teamId, options);
   }
@@ -121,3 +130,4 @@ export class TeamService {
 }
 
 export const teamService = new TeamService();
+

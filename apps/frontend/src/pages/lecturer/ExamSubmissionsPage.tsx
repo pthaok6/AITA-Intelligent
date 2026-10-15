@@ -20,6 +20,7 @@ export const ExamSubmissionsPage: React.FC = () => {
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [reports, setReports] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
+  const [classStudents, setClassStudents] = useState<any[]>([]);
   const [syncingGit, setSyncingGit] = useState<string | null>(null);
   const [newTeamName, setNewTeamName] = useState('');
   const [newTeamRepo, setNewTeamRepo] = useState('');
@@ -33,6 +34,15 @@ export const ExamSubmissionsPage: React.FC = () => {
   const [savingGithub, setSavingGithub] = useState(false);
   const [editingRepoUrl, setEditingRepoUrl] = useState<{ teamId: string; repoUrl: string } | null>(null);
   const [savingRepo, setSavingRepo] = useState(false);
+
+  // Thêm thành viên vào nhóm
+  const [addingMemberTeamId, setAddingMemberTeamId] = useState<string | null>(null);
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [memberRole, setMemberRole] = useState<'MEMBER' | 'LEADER'>('MEMBER');
+  const [memberGithub, setMemberGithub] = useState('');
+  const [savingMember, setSavingMember] = useState(false);
+  const [deletingTeamId, setDeletingTeamId] = useState<string | null>(null);
+
   const selectedExam = exams.find(exam => exam.id === selectedExamId);
 
   const handleSaveGithub = async (teamId: string, studentId: string) => {
@@ -66,6 +76,71 @@ export const ExamSubmissionsPage: React.FC = () => {
       if (teamRes.success && teamRes.data) setTeams(teamRes.data);
     } else {
       setError(res.message || 'Không thể lưu repo URL.');
+    }
+  };
+
+  const handleAddMember = async (teamId: string) => {
+    if (!selectedStudentId) {
+      setError('Vui lòng chọn sinh viên cần thêm vào nhóm.');
+      return;
+    }
+    setSavingMember(true);
+    setError('');
+    const res = await apiRequest(`/teams/${teamId}/members`, {
+      method: 'POST',
+      body: JSON.stringify({
+        studentId: selectedStudentId,
+        role: memberRole,
+        githubUsername: memberGithub.trim() || undefined,
+      }),
+    });
+    setSavingMember(false);
+    if (res.success) {
+      setAddingMemberTeamId(null);
+      setSelectedStudentId('');
+      setMemberRole('MEMBER');
+      setMemberGithub('');
+      const teamRes = await apiRequest(`/exams/${selectedExamId}/teams`);
+      if (teamRes.success && teamRes.data) setTeams(teamRes.data);
+    } else {
+      setError(res.message || 'Không thể thêm thành viên vào nhóm.');
+    }
+  };
+
+  const handleRemoveMember = async (teamId: string, studentId: string) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa sinh viên này khỏi nhóm?')) return;
+    const res = await apiRequest(`/teams/${teamId}/members/${studentId}`, { method: 'DELETE' });
+    if (res.success) {
+      const teamRes = await apiRequest(`/exams/${selectedExamId}/teams`);
+      if (teamRes.success && teamRes.data) setTeams(teamRes.data);
+    } else {
+      setError(res.message || 'Không thể xóa thành viên khỏi nhóm.');
+    }
+  };
+
+  const handleChangeLeader = async (teamId: string, newLeaderStudentId: string) => {
+    const res = await apiRequest(`/teams/${teamId}/leader`, {
+      method: 'PUT',
+      body: JSON.stringify({ newLeaderStudentId, reason: 'Giảng viên chỉ định Trưởng nhóm mới (BR-13)' }),
+    });
+    if (res.success) {
+      const teamRes = await apiRequest(`/exams/${selectedExamId}/teams`);
+      if (teamRes.success && teamRes.data) setTeams(teamRes.data);
+    } else {
+      setError(res.message || 'Không thể đổi Trưởng nhóm.');
+    }
+  };
+
+  const handleDeleteTeam = async (teamId: string, teamName: string) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa nhóm "${teamName}"?`)) return;
+    setDeletingTeamId(teamId);
+    const res = await apiRequest(`/teams/${teamId}`, { method: 'DELETE' });
+    setDeletingTeamId(null);
+    if (res.success) {
+      const teamRes = await apiRequest(`/exams/${selectedExamId}/teams`);
+      if (teamRes.success && teamRes.data) setTeams(teamRes.data);
+    } else {
+      setError(res.message || 'Không thể xóa nhóm.');
     }
   };
 
@@ -118,12 +193,21 @@ export const ExamSubmissionsPage: React.FC = () => {
   useEffect(() => {
     const fetchExams = async () => {
       setLoading(true);
-      const res = await apiRequest(`/exams/class/${classId}`);
-      if (res.success && res.data) {
-        setExams(res.data);
-        if (res.data.length > 0) {
-          setSelectedExamId(res.data[0].id);
+      const [examRes, classRes] = await Promise.all([
+        apiRequest(`/exams/class/${classId}`),
+        apiRequest(`/classes/${classId}`),
+      ]);
+      if (examRes.success && examRes.data) {
+        setExams(examRes.data);
+        if (examRes.data.length > 0) {
+          setSelectedExamId(examRes.data[0].id);
         }
+      }
+      if (classRes.success && classRes.data?.enrollments) {
+        const activeStudents = classRes.data.enrollments
+          .filter((e: any) => e.status === 'ACTIVE' && e.student)
+          .map((e: any) => e.student);
+        setClassStudents(activeStudents);
       }
       setLoading(false);
     };
@@ -230,6 +314,14 @@ export const ExamSubmissionsPage: React.FC = () => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                           <div>
                             <strong style={{ fontSize: '1.1rem', color: '#f8fafc' }}>{team.name}</strong>
+                            <button
+                              title="Xóa nhóm này"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '0.85rem', marginLeft: '0.5rem' }}
+                              disabled={deletingTeamId === team.id}
+                              onClick={() => handleDeleteTeam(team.id, team.name)}
+                            >
+                              🗑️
+                            </button>
                             {editingRepoUrl?.teamId === team.id ? (
                               <span style={{ marginLeft: '1rem', display: 'inline-flex', gap: '0.25rem', alignItems: 'center' }}>
                                 <input
@@ -275,7 +367,7 @@ export const ExamSubmissionsPage: React.FC = () => {
                         </div>
 
                         {(!team.members || team.members.length === 0) ? (
-                          <p style={{ fontSize: '0.85rem', color: '#64748b' }}>Nhóm chưa có thành viên nào.</p>
+                          <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '0.5rem 0' }}>Nhóm chưa có thành viên nào.</p>
                         ) : (
                           <table className="table" style={{ fontSize: '0.875rem' }}>
                             <thead>
@@ -287,6 +379,7 @@ export const ExamSubmissionsPage: React.FC = () => {
                                 <th>% Đóng góp</th>
                                 <th>Cảnh báo Free-rider (BR-05)</th>
                                 <th>Điểm cá nhân (BR-12)</th>
+                                <th>Thao tác</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -353,11 +446,115 @@ export const ExamSubmissionsPage: React.FC = () => {
                                     <td style={{ fontWeight: 'bold', fontSize: '1rem', color: (contrib && contrib.personalScore != null) ? '#34d399' : '#94a3b8' }}>
                                       {(contrib && contrib.personalScore != null) ? `${contrib.personalScore} pts` : latestSub?.status === 'COMPLETED' ? 'Bấm đồng bộ để tính' : 'Chờ chấm bài nhóm'}
                                     </td>
+                                    <td style={{ whiteSpace: 'nowrap' }}>
+                                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                                        {m.role !== 'LEADER' && (
+                                          <button
+                                            className="btn btn-secondary btn-sm"
+                                            style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: '#d97706', color: '#fff', border: 'none' }}
+                                            title="Chỉ định bạn này làm Trưởng nhóm (Leader) theo BR-13"
+                                            onClick={() => handleChangeLeader(team.id, m.studentId)}
+                                          >
+                                            👑 Đặt Leader
+                                          </button>
+                                        )}
+                                        <button
+                                          className="btn btn-ghost-danger btn-sm"
+                                          style={{ fontSize: '0.75rem', padding: '0.2rem 0.4rem' }}
+                                          title="Xóa thành viên khỏi nhóm"
+                                          onClick={() => handleRemoveMember(team.id, m.studentId)}
+                                        >
+                                          🗑️
+                                        </button>
+                                      </div>
+                                    </td>
                                   </tr>
                                 );
                               })}
                             </tbody>
                           </table>
+                        )}
+
+                        {/* FORM: THÊM THÀNH VIÊN VÀO NHÓM */}
+                        {addingMemberTeamId === team.id ? (
+                          <div style={{ marginTop: '0.75rem', padding: '0.85rem', background: '#1e293b', borderRadius: '6px', border: '1px solid #475569' }}>
+                            <h5 style={{ margin: '0 0 0.5rem 0', color: '#38bdf8', fontSize: '0.95rem' }}>+ Thêm sinh viên vào {team.name}</h5>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr)) auto', gap: '0.5rem', alignItems: 'flex-end' }}>
+                              <div>
+                                <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '3px' }}>Chọn sinh viên trong lớp</label>
+                                <select
+                                  className="form-control"
+                                  style={{ fontSize: '0.85rem', width: '100%' }}
+                                  value={selectedStudentId}
+                                  onChange={e => setSelectedStudentId(e.target.value)}
+                                >
+                                  <option value="">-- Chọn sinh viên --</option>
+                                  {classStudents
+                                    .filter(s => !team.members?.some((m: any) => m.studentId === s.id))
+                                    .map(s => (
+                                      <option key={s.id} value={s.id}>
+                                        {s.fullName} ({s.email})
+                                      </option>
+                                    ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '3px' }}>Vai trò</label>
+                                <select
+                                  className="form-control"
+                                  style={{ fontSize: '0.85rem', width: '100%' }}
+                                  value={memberRole}
+                                  onChange={e => setMemberRole(e.target.value as any)}
+                                >
+                                  <option value="MEMBER">Thành viên (Member)</option>
+                                  <option value="LEADER">Trưởng nhóm (Leader)</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '3px' }}>GitHub Username (tuỳ chọn)</label>
+                                <input
+                                  className="form-control"
+                                  style={{ fontSize: '0.85rem', width: '100%' }}
+                                  placeholder="vd: octocat"
+                                  value={memberGithub}
+                                  onChange={e => setMemberGithub(e.target.value)}
+                                />
+                              </div>
+                              <div style={{ display: 'flex', gap: '0.25rem' }}>
+                                <button
+                                  className="btn btn-primary btn-sm"
+                                  disabled={savingMember}
+                                  onClick={() => handleAddMember(team.id)}
+                                >
+                                  {savingMember ? 'Đang thêm...' : 'Lưu'}
+                                </button>
+                                <button
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={() => {
+                                    setAddingMemberTeamId(null);
+                                    setSelectedStudentId('');
+                                  }}
+                                >
+                                  Hủy
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ marginTop: '0.75rem' }}>
+                            <button
+                              className="btn btn-secondary btn-sm"
+                              style={{ fontSize: '0.8rem', background: '#1e293b', color: '#38bdf8', border: '1px dashed #38bdf8' }}
+                              onClick={() => {
+                                setAddingMemberTeamId(team.id);
+                                setSelectedStudentId('');
+                                setMemberRole('MEMBER');
+                                setMemberGithub('');
+                              }}
+                            >
+                              + Thêm thành viên vào nhóm này
+                            </button>
+                          </div>
                         )}
                       </div>
                     );

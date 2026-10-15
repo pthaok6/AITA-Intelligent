@@ -16,6 +16,16 @@ teamRouter.post('/exams/:examId/teams', authenticateJwt, requireRoles('LECTURER'
   } catch (error) { next(error); }
 });
 
+// LECTURER: Delete empty team
+teamRouter.delete('/teams/:teamId', authenticateJwt, requireRoles('LECTURER', 'ADMIN'), async (req: AuthRequest, res: Response, next) => {
+  try {
+    const teamId = req.params.teamId as string;
+    const result = await teamService.deleteTeam(teamId);
+    res.status(200).json({ success: true, message: result.message });
+  } catch (error) { next(error); }
+});
+
+
 // GET all teams for an exam (Lecturer or Student in class)
 teamRouter.get('/exams/:examId/teams', authenticateJwt, async (req: AuthRequest, res: Response, next) => {
   try {
