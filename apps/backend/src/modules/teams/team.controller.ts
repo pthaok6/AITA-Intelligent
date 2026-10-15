@@ -77,7 +77,22 @@ teamRouter.put('/teams/:teamId/repo', authenticateJwt, async (req: AuthRequest, 
   } catch (error) { next(error); }
 });
 
-// UPDATE student's own GitHub username
+// UPDATE student's GitHub username (Lecturer or self)
+teamRouter.put('/teams/:teamId/members/:studentId/github', authenticateJwt, async (req: AuthRequest, res: Response, next) => {
+  try {
+    const teamId = req.params.teamId as string;
+    const studentId = req.params.studentId as string;
+    const { githubUsername } = req.body;
+    const isLecturer = req.user!.role === 'LECTURER' || req.user!.role === 'ADMIN';
+    if (!isLecturer && req.user!.userId !== studentId) {
+      throw new HttpError(403, 'Bạn chỉ có thể cập nhật GitHub username của chính mình.');
+    }
+    const member = await teamService.updateMemberGithub(teamId, studentId, (githubUsername || '').trim());
+    res.status(200).json({ success: true, data: member });
+  } catch (error) { next(error); }
+});
+
+// UPDATE student's own GitHub username (alias)
 teamRouter.put('/teams/:teamId/my-github', authenticateJwt, async (req: AuthRequest, res: Response, next) => {
   try {
     const teamId = req.params.teamId as string;

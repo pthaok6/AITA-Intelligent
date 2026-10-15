@@ -29,7 +29,45 @@ export const ExamSubmissionsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [confirmDeleteExam, setConfirmDeleteExam] = useState(false);
   const [deletingExam, setDeletingExam] = useState(false);
+  const [editingMemberGithub, setEditingMemberGithub] = useState<{ teamId: string; studentId: string; username: string } | null>(null);
+  const [savingGithub, setSavingGithub] = useState(false);
+  const [editingRepoUrl, setEditingRepoUrl] = useState<{ teamId: string; repoUrl: string } | null>(null);
+  const [savingRepo, setSavingRepo] = useState(false);
   const selectedExam = exams.find(exam => exam.id === selectedExamId);
+
+  const handleSaveGithub = async (teamId: string, studentId: string) => {
+    if (!editingMemberGithub) return;
+    setSavingGithub(true);
+    const res = await apiRequest(`/teams/${teamId}/members/${studentId}/github`, {
+      method: 'PUT',
+      body: JSON.stringify({ githubUsername: editingMemberGithub.username }),
+    });
+    setSavingGithub(false);
+    if (res.success) {
+      setEditingMemberGithub(null);
+      const teamRes = await apiRequest(`/exams/${selectedExamId}/teams`);
+      if (teamRes.success && teamRes.data) setTeams(teamRes.data);
+    } else {
+      setError(res.message || 'Không thể lưu GitHub username.');
+    }
+  };
+
+  const handleSaveRepo = async (teamId: string) => {
+    if (!editingRepoUrl) return;
+    setSavingRepo(true);
+    const res = await apiRequest(`/teams/${teamId}/repo`, {
+      method: 'PUT',
+      body: JSON.stringify({ repoUrl: editingRepoUrl.repoUrl }),
+    });
+    setSavingRepo(false);
+    if (res.success) {
+      setEditingRepoUrl(null);
+      const teamRes = await apiRequest(`/exams/${selectedExamId}/teams`);
+      if (teamRes.success && teamRes.data) setTeams(teamRes.data);
+    } else {
+      setError(res.message || 'Không thể lưu repo URL.');
+    }
+  };
 
   const deleteExam = async () => {
     if (!selectedExam || selectedExam._count?.submissions > 0) return;
@@ -192,12 +230,35 @@ export const ExamSubmissionsPage: React.FC = () => {
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
                           <div>
                             <strong style={{ fontSize: '1.1rem', color: '#f8fafc' }}>{team.name}</strong>
-                            {team.repoUrl ? (
-                              <a href={team.repoUrl} target="_blank" rel="noreferrer" style={{ marginLeft: '1rem', fontSize: '0.85rem', color: '#38bdf8' }}>
-                                🔗 {team.repoUrl}
-                              </a>
+                            {editingRepoUrl?.teamId === team.id ? (
+                              <span style={{ marginLeft: '1rem', display: 'inline-flex', gap: '0.25rem', alignItems: 'center' }}>
+                                <input
+                                  className="form-control"
+                                  style={{ padding: '0.2rem 0.4rem', fontSize: '0.8rem', width: '250px' }}
+                                  value={editingRepoUrl ? editingRepoUrl.repoUrl : ''}
+                                  onChange={e => setEditingRepoUrl({ teamId: team.id, repoUrl: e.target.value })}
+                                  placeholder="https://github.com/owner/repo"
+                                />
+                                <button className="btn btn-primary btn-sm" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }} disabled={savingRepo} onClick={() => handleSaveRepo(team.id)}>Lưu</button>
+                                <button className="btn btn-secondary btn-sm" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }} onClick={() => setEditingRepoUrl(null)}>✕</button>
+                              </span>
                             ) : (
-                              <span style={{ marginLeft: '1rem', fontSize: '0.85rem', color: '#64748b' }}>(Chưa gắn link repo)</span>
+                              <span>
+                                {team.repoUrl ? (
+                                  <a href={team.repoUrl} target="_blank" rel="noreferrer" style={{ marginLeft: '1rem', fontSize: '0.85rem', color: '#38bdf8' }}>
+                                    🔗 {team.repoUrl}
+                                  </a>
+                                ) : (
+                                  <span style={{ marginLeft: '1rem', fontSize: '0.85rem', color: '#64748b' }}>(Chưa gắn link repo)</span>
+                                )}
+                                <button
+                                  title="Sửa Link GitHub Repo"
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#38bdf8', fontSize: '0.8rem', marginLeft: '0.5rem' }}
+                                  onClick={() => setEditingRepoUrl({ teamId: team.id, repoUrl: team.repoUrl || '' })}
+                                >
+                                  ✏️
+                                </button>
+                              </span>
                             )}
                             <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.25rem' }}>
                               Điểm bài nộp nhóm (Docker): <strong style={{ color: latestSub?.status === 'COMPLETED' ? '#34d399' : '#e2e8f0' }}>{latestSub ? `${latestSub.totalScore} pts (${latestSub.status})` : 'Chưa nộp bài'}</strong>
@@ -242,7 +303,33 @@ export const ExamSubmissionsPage: React.FC = () => {
                                         {m.role === 'LEADER' ? 'Trưởng nhóm (Leader)' : 'Thành viên'}
                                       </span>
                                     </td>
-                                    <td>{m.githubUsername || <span style={{ color: '#64748b' }}>Chưa cập nhật</span>}</td>
+                                    <td>
+                                      {editingMemberGithub?.studentId === m.studentId ? (
+                                        <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                                          <input
+                                            className="form-control"
+                                            style={{ padding: '0.2rem 0.4rem', fontSize: '0.8rem', width: '120px' }}
+                                            value={editingMemberGithub ? editingMemberGithub.username : ''}
+                                            onChange={e => setEditingMemberGithub({ teamId: team.id, studentId: m.studentId, username: e.target.value })}
+                                            placeholder="GitHub username"
+                                            autoFocus
+                                          />
+                                          <button className="btn btn-primary btn-sm" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }} disabled={savingGithub} onClick={() => handleSaveGithub(team.id, m.studentId)}>Lưu</button>
+                                          <button className="btn btn-secondary btn-sm" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }} onClick={() => setEditingMemberGithub(null)}>✕</button>
+                                        </div>
+                                      ) : (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                          <span>{m.githubUsername || <span style={{ color: '#64748b' }}>Chưa cập nhật</span>}</span>
+                                          <button
+                                            title="Sửa GitHub username"
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#38bdf8', fontSize: '0.8rem', padding: '0 2px' }}
+                                            onClick={() => setEditingMemberGithub({ teamId: team.id, studentId: m.studentId, username: m.githubUsername || '' })}
+                                          >
+                                            ✏️
+                                          </button>
+                                        </div>
+                                      )}
+                                    </td>
                                     <td>{contrib ? `${contrib.commitsCount} commits / +${contrib.locAdded} -${contrib.locDeleted}` : '-'}</td>
                                     <td>
                                       {contrib ? (
