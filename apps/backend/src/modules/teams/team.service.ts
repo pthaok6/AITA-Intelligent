@@ -120,6 +120,30 @@ export class TeamService {
     return { message: 'Đã xóa nhóm thành công.' };
   }
 
+  // Lecturer manually overrides/grades a student's score
+  async updateMemberScore(teamId: string, studentId: string, score: number) {
+    if (isNaN(score) || score < 0) throw new HttpError(400, 'Điểm số không hợp lệ.');
+    const member = await prisma.teamMember.findUnique({
+      where: { teamId_studentId: { teamId, studentId } },
+    });
+    if (!member) throw new HttpError(404, 'Không tìm thấy thành viên trong nhóm.');
+
+    return prisma.gitContribution.upsert({
+      where: { teamId_memberId: { teamId, memberId: member.id } },
+      update: { personalScore: score, syncedAt: new Date() },
+      create: {
+        teamId,
+        memberId: member.id,
+        commitsCount: 0,
+        locAdded: 0,
+        locDeleted: 0,
+        contributionPercent: 0,
+        personalScore: score,
+        isWarning: false,
+      },
+    });
+  }
+
   async syncGitAnalytics(teamId: string, options?: { lowerBound?: number; upperBound?: number }) {
     return this.gitAnalytics.syncTeamContributions(teamId, options);
   }

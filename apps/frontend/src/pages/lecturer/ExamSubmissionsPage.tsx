@@ -41,9 +41,30 @@ export const ExamSubmissionsPage: React.FC = () => {
   const [memberRole, setMemberRole] = useState<'MEMBER' | 'LEADER'>('MEMBER');
   const [memberGithub, setMemberGithub] = useState('');
   const [savingMember, setSavingMember] = useState(false);
+  const [editingMemberScore, setEditingMemberScore] = useState<{ teamId: string; studentId: string; score: string } | null>(null);
+  const [savingScore, setSavingScore] = useState(false);
   const [deletingTeamId, setDeletingTeamId] = useState<string | null>(null);
 
   const selectedExam = exams.find(exam => exam.id === selectedExamId);
+
+  const handleSaveScore = async (teamId: string, studentId: string) => {
+    if (!editingMemberScore) return;
+    setSavingScore(true);
+    const scoreVal = parseFloat(editingMemberScore.score);
+    const res = await apiRequest(`/teams/${teamId}/members/${studentId}/score`, {
+      method: 'PUT',
+      body: JSON.stringify({ score: isNaN(scoreVal) ? 0 : scoreVal }),
+    });
+    setSavingScore(false);
+    if (res.success) {
+      setEditingMemberScore(null);
+      const teamRes = await apiRequest(`/exams/${selectedExamId}/teams`);
+      if (teamRes.success && teamRes.data) setTeams(teamRes.data);
+    } else {
+      setError(res.message || 'Không thể lưu điểm.');
+    }
+  };
+
 
   const handleSaveGithub = async (teamId: string, studentId: string) => {
     if (!editingMemberGithub) return;
@@ -378,7 +399,7 @@ export const ExamSubmissionsPage: React.FC = () => {
                                 <th>Commits / LOC</th>
                                 <th>% Đóng góp</th>
                                 <th>Cảnh báo Free-rider (BR-05)</th>
-                                <th>Điểm cá nhân (BR-12)</th>
+                                <th>Điểm cá nhân (BR-12 / Chấm tay)</th>
                                 <th>Thao tác</th>
                               </tr>
                             </thead>
@@ -443,8 +464,37 @@ export const ExamSubmissionsPage: React.FC = () => {
                                         <span className="badge badge-green">Đạt yêu cầu</span>
                                       ) : '-'}
                                     </td>
-                                    <td style={{ fontWeight: 'bold', fontSize: '1rem', color: (contrib && contrib.personalScore != null) ? '#34d399' : '#94a3b8' }}>
-                                      {(contrib && contrib.personalScore != null) ? `${contrib.personalScore} pts` : latestSub?.status === 'COMPLETED' ? 'Bấm đồng bộ để tính' : 'Chờ chấm bài nhóm'}
+                                    <td style={{ minWidth: '130px' }}>
+                                      {editingMemberScore?.studentId === m.studentId ? (
+                                        <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                                          <input
+                                            type="number"
+                                            step="0.1"
+                                            min="0"
+                                            max="12"
+                                            className="form-control"
+                                            style={{ padding: '0.2rem 0.4rem', fontSize: '0.8rem', width: '65px' }}
+                                            value={editingMemberScore ? editingMemberScore.score : ''}
+                                            onChange={e => setEditingMemberScore({ teamId: team.id, studentId: m.studentId, score: e.target.value })}
+                                            autoFocus
+                                          />
+                                          <button className="btn btn-primary btn-sm" style={{ padding: '0.2rem 0.4rem', fontSize: '0.75rem' }} disabled={savingScore} onClick={() => handleSaveScore(team.id, m.studentId)}>Lưu</button>
+                                          <button className="btn btn-secondary btn-sm" style={{ padding: '0.2rem 0.4rem', fontSize: '0.75rem' }} onClick={() => setEditingMemberScore(null)}>✕</button>
+                                        </div>
+                                      ) : (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                          <span style={{ fontWeight: 'bold', fontSize: '0.95rem', color: (contrib && contrib.personalScore != null) ? '#34d399' : '#94a3b8' }}>
+                                            {(contrib && contrib.personalScore != null) ? `${contrib.personalScore} pts` : latestSub?.status === 'COMPLETED' ? 'Chưa tính' : '-'}
+                                          </span>
+                                          <button
+                                            title="Chấm điểm thủ công / Ghi đè điểm cho SV này"
+                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f59e0b', fontSize: '0.8rem', padding: '0 2px' }}
+                                            onClick={() => setEditingMemberScore({ teamId: team.id, studentId: m.studentId, score: String(contrib?.personalScore != null ? contrib.personalScore : (latestSub?.totalScore || 0)) })}
+                                          >
+                                            ✏️
+                                          </button>
+                                        </div>
+                                      )}
                                     </td>
                                     <td style={{ whiteSpace: 'nowrap' }}>
                                       <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>

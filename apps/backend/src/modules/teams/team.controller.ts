@@ -102,6 +102,18 @@ teamRouter.put('/teams/:teamId/members/:studentId/github', authenticateJwt, asyn
   } catch (error) { next(error); }
 });
 
+// LECTURER: Manual grade override for a team member
+teamRouter.put('/teams/:teamId/members/:studentId/score', authenticateJwt, requireRoles('LECTURER', 'ADMIN'), async (req: AuthRequest, res: Response, next) => {
+  try {
+    const teamId = req.params.teamId as string;
+    const studentId = req.params.studentId as string;
+    const { score } = req.body;
+    const updated = await teamService.updateMemberScore(teamId, studentId, Number(score));
+    res.status(200).json({ success: true, data: updated });
+  } catch (error) { next(error); }
+});
+
+
 // UPDATE student's own GitHub username (alias)
 teamRouter.put('/teams/:teamId/my-github', authenticateJwt, async (req: AuthRequest, res: Response, next) => {
   try {
