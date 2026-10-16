@@ -34,36 +34,23 @@ test('BR-05: Free-rider flag triggers when contribution is strictly below 5%', (
   assert.equal(highContrib < 5.0, false, '35.5% must NOT trigger warning');
 });
 
-test('BR-12: Clamping formula restricts score factor to [0.5, 1.2]', () => {
-  const lowerBound = 0.5;
-  const upperBound = 1.2;
+test('BR-12: Highest contributor receives team score; other scores scale by contribution ratio', () => {
   const teamScore = 10.0;
-  const teamSize = 4;
-  const expectedPercent = 100 / teamSize; // 25%
+  const maxPercent = 60.0;
 
-  // Case 1: Member contributes very little (2.5% vs 25% expected -> ratio = 0.1)
+  // Case 1: Member contributes 2.5% while the highest contributor has 60%.
   const lowPercent = 2.5;
-  const rawFactor1 = lowPercent / expectedPercent; // 0.1
-  const clampedFactor1 = Math.min(upperBound, Math.max(lowerBound, rawFactor1)); // 0.5
-  assert.equal(clampedFactor1, 0.5, 'Factor must be clamped to lower bound 0.5');
-  const personalScore1 = Math.round(teamScore * clampedFactor1 * 100) / 100;
-  assert.equal(personalScore1, 5.0, 'Personal score should be 5.0');
+  const personalScore1 = Math.round(teamScore * (lowPercent / maxPercent) * 100) / 100;
+  assert.equal(personalScore1, 0.42, 'Personal score should scale directly against the highest contribution');
 
-  // Case 2: Member contributes average (25% vs 25% expected -> ratio = 1.0)
+  // Case 2: Member contributes 25% while the highest contributor has 60%.
   const avgPercent = 25.0;
-  const rawFactor2 = avgPercent / expectedPercent; // 1.0
-  const clampedFactor2 = Math.min(upperBound, Math.max(lowerBound, rawFactor2)); // 1.0
-  assert.equal(clampedFactor2, 1.0);
-  const personalScore2 = Math.round(teamScore * clampedFactor2 * 100) / 100;
-  assert.equal(personalScore2, 10.0, 'Personal score should be 10.0');
+  const personalScore2 = Math.round(teamScore * (avgPercent / maxPercent) * 100) / 100;
+  assert.equal(personalScore2, 4.17, 'Personal score should scale directly against the highest contribution');
 
-  // Case 3: Member carries team (60% vs 25% expected -> ratio = 2.4)
-  const highPercent = 60.0;
-  const rawFactor3 = highPercent / expectedPercent; // 2.4
-  const clampedFactor3 = Math.min(upperBound, Math.max(lowerBound, rawFactor3)); // 1.2
-  assert.equal(clampedFactor3, 1.2, 'Factor must be clamped to upper bound 1.2');
-  const personalScore3 = Math.round(teamScore * clampedFactor3 * 100) / 100;
-  assert.equal(personalScore3, 12.0, 'Personal score should be 12.0');
+  // Case 3: Highest contributor gets the team's score.
+  const personalScore3 = Math.round(teamScore * (maxPercent / maxPercent) * 100) / 100;
+  assert.equal(personalScore3, 10.0, 'Highest contributor should receive the team score');
 });
 
 test('BR-11 & BR-13 rule constraints verification', () => {

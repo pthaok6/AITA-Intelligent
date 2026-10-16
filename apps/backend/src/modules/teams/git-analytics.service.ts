@@ -56,13 +56,7 @@ export class GitAnalyticsService {
     return stats;
   }
 
-  async syncTeamContributions(
-    teamId: string,
-    options: { lowerBound?: number; upperBound?: number } = {}
-  ): Promise<MemberStats[]> {
-    const lowerBound = options.lowerBound ?? 0.5;
-    const upperBound = options.upperBound ?? 1.2;
-
+  async syncTeamContributions(teamId: string): Promise<MemberStats[]> {
     const team = await this.teamRepo.findTeamById(teamId);
     if (!team) throw new Error('Không tìm thấy nhóm.');
 
@@ -119,26 +113,24 @@ export class GitAnalyticsService {
     const latestSubmission = team.submissions && team.submissions.length > 0 ? team.submissions[0] : null;
     const teamScore = latestSubmission && latestSubmission.status === 'COMPLETED' ? latestSubmission.totalScore : null;
 
-    const teamSize = members.length;
-    const expectedPercent = 100 / teamSize;
-
+    const contributionRecords = memberRecords.map(rec => {
+      const contributionPercent = totalTeamActivity > 0
+        ? Math.round((rec.activityWeight / totalTeamActivity) * 1000) / 10
+        : 0.0;
+      return {
+        ...rec,
+        contributionPercent,
+        isWarning: contributionPercent < 5.0,
+      };
+    });
+    const maxContributionPercent = Math.max(...contributionRecords.map(rec => rec.contributionPercent));
     const results: MemberStats[] = [];
 
-    for (const rec of memberRecords) {
-      const contributionPercent = totalTeamActivity > 0
-        ? Math.round((rec.activityWeight / totalTeamActivity) * 1000) / 10 // e.g. 35.5%
-        : 0.0;
-
-      // BR-05: Warning if contribution is below 5%
-      const isWarning = contributionPercent < 5.0;
-
-      // BR-12: Personal Score computation
-      let personalScore: number | null = null;
-      if (teamScore !== null) {
-        const rawFactor = contributionPercent / expectedPercent;
-        const clampedFactor = Math.min(upperBound, Math.max(lowerBound, rawFactor));
-        personalScore = Math.round(teamScore * clampedFactor * 100) / 100;
-      }
+    for (const rec of contributionRecords) {
+      // BR-12: highest contributor receives the team score; others are proportional to that member.
+      const personalScore = teamScore !== null && maxContributionPercent > 0
+        ? Math.round(teamScore * (rec.contributionPercent / maxContributionPercent) * 100) / 100
+        : null;
 
       await this.teamRepo.saveContribution({
         teamId,
@@ -146,9 +138,9 @@ export class GitAnalyticsService {
         commitsCount: rec.commits,
         locAdded: rec.additions,
         locDeleted: rec.deletions,
-        contributionPercent,
+        contributionPercent: rec.contributionPercent,
         personalScore,
-        isWarning,
+        isWarning: rec.isWarning,
       });
 
       results.push({
@@ -161,9 +153,9 @@ export class GitAnalyticsService {
         commitsCount: rec.commits,
         locAdded: rec.additions,
         locDeleted: rec.deletions,
-        contributionPercent,
+        contributionPercent: rec.contributionPercent,
         personalScore,
-        isWarning,
+        isWarning: rec.isWarning,
       });
     }
 

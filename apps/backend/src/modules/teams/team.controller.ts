@@ -129,8 +129,7 @@ teamRouter.put('/teams/:teamId/my-github', authenticateJwt, async (req: AuthRequ
 teamRouter.post('/teams/:teamId/sync-git', authenticateJwt, async (req: AuthRequest, res: Response, next) => {
   try {
     const teamId = req.params.teamId as string;
-    const { lowerBound, upperBound } = req.body;
-    const contributions = await teamService.syncGitAnalytics(teamId, { lowerBound, upperBound });
+    const contributions = await teamService.syncGitAnalytics(teamId);
     res.status(200).json({ success: true, data: contributions });
   } catch (error) { next(error); }
 });

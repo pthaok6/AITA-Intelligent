@@ -144,8 +144,8 @@ export class TeamService {
     });
   }
 
-  async syncGitAnalytics(teamId: string, options?: { lowerBound?: number; upperBound?: number }) {
-    return this.gitAnalytics.syncTeamContributions(teamId, options);
+  async syncGitAnalytics(teamId: string) {
+    return this.gitAnalytics.syncTeamContributions(teamId);
   }
 
   async getTeamContributions(teamId: string) {
