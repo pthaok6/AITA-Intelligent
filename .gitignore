@@ -10,4 +10,7 @@ apps/backend/dist/
 *.db-wal
 apps/backend/storage/
 apps/backend/storage-test-*/
-apps/backend/test/
+apps/backend/tests/
+ref
+apps/frontend/node_modules/
+node_modules
