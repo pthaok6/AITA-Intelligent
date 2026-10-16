@@ -30,7 +30,8 @@ const RootRedirect: React.FC = () => {
     );
   }
   if (!isAuthenticated) return <Navigate to="/login" replace />;
-  if (user?.role !== 'STUDENT') return <Navigate to="/lecturer" replace />;
+  if (user?.role === 'ADMIN') return <Navigate to="/admin" replace />;
+  if (user?.role === 'LECTURER') return <Navigate to="/lecturer" replace />;
   return <Navigate to="/student" replace />;
 };
 
@@ -63,8 +64,10 @@ export const App: React.FC = () => {
               <Route path="/register" element={<RegisterPage />} />
 
               {/* Lecturer Routes */}
+              <Route path="/admin" element={<ProtectedRoute allowedRoles={['ADMIN']}><LecturerDashboard /></ProtectedRoute>} />
+              <Route path="/admin/appeals" element={<ProtectedRoute allowedRoles={['ADMIN']}><LecturerAppealsPage /></ProtectedRoute>} />
               <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminUsersPage /></ProtectedRoute>} />
-              <Route path="/lecturer/classes/:classId/import-students" element={<ProtectedRoute allowedRoles={['LECTURER', 'ADMIN']}><ImportStudentsPage /></ProtectedRoute>} />
+              <Route path="/lecturer/classes/:classId/import-students" element={<ProtectedRoute allowedRoles={['LECTURER']}><ImportStudentsPage /></ProtectedRoute>} />
               <Route path="/lecturer/classes/:classId/exams/:examId/edit" element={<ProtectedRoute allowedRoles={['LECTURER', 'ADMIN']}><EditExamPage /></ProtectedRoute>} />
               <Route path="/lecturer/classes/:classId/students" element={<ProtectedRoute allowedRoles={['LECTURER', 'ADMIN']}><ClassRosterPage /></ProtectedRoute>} />
               <Route
@@ -78,7 +81,7 @@ export const App: React.FC = () => {
               <Route
                 path="/lecturer/classes/:classId/create-exam"
                 element={
-                  <ProtectedRoute allowedRoles={['LECTURER', 'ADMIN']}>
+                  <ProtectedRoute allowedRoles={['LECTURER']}>
                     <CreateExamPage />
                   </ProtectedRoute>
                 }

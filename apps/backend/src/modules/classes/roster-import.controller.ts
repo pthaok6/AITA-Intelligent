@@ -18,7 +18,7 @@ function mapping(value: unknown) {
   try { return JSON.parse(String(value)); } catch { throw new HttpError(400, 'Mapping không hợp lệ.'); }
 }
 // Authorization precedes reading the multipart body.
-rosterImportRouter.use('/:classId/students/import', authenticateJwt, requireRoles('LECTURER', 'ADMIN'), asyncRoute(async (req, _res, next) => {
+rosterImportRouter.use('/:classId/students/import', authenticateJwt, requireRoles('LECTURER'), asyncRoute(async (req, _res, next) => {
   await rosterImportService.authorize(String(req.params.classId), req.user);
   next();
 }));

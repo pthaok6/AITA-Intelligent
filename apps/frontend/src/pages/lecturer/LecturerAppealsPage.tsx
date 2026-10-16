@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
+import { useAuth } from '../../contexts/AuthContext';
 
 const formatDate = (value: string) => {
   return new Date(value).toLocaleString('vi-VN', {
@@ -28,6 +29,9 @@ const getStatusBadge = (status: string) => {
 };
 
 export const LecturerAppealsPage: React.FC = () => {
+  const { user } = useAuth();
+  const dashboardPath = user?.role === 'ADMIN' ? '/admin' : '/lecturer';
+  const dashboardLabel = user?.role === 'ADMIN' ? 'Quay lại Tổng quan' : 'Quay lại Dashboard Giảng viên';
   const [appeals, setAppeals] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
@@ -138,7 +142,7 @@ export const LecturerAppealsPage: React.FC = () => {
   return (
     <div className="container page-appeals" style={{ maxWidth: 1200 }}>
       <div style={{ marginBottom: '1rem' }}>
-        <Link to="/lecturer">← Quay lại Dashboard Giảng viên</Link>
+        <Link to={dashboardPath}>← {dashboardLabel}</Link>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>

@@ -31,7 +31,11 @@ export const Navbar: React.FC = () => {
           {logoutError && <p role="alert">{logoutError}</p>}
           {isAuthenticated ? (
             <div className="app-account-actions">
-              {user?.role === 'ADMIN' && <Link to="/admin/users" className="btn btn-secondary btn-sm">Quản lý tài khoản</Link>}
+              {user?.role === 'ADMIN' && <>
+                <Link to="/admin" className="btn btn-secondary btn-sm">Tổng quan</Link>
+                <Link to="/admin/appeals" className="btn btn-secondary btn-sm">Khiếu nại</Link>
+                <Link to="/admin/users" className="btn btn-secondary btn-sm">Tài khoản</Link>
+              </>}
               <span className="app-user-label">
                 {user?.fullName} <span className="badge badge-blue">{user?.role}</span>
               </span>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -56,10 +57,13 @@ export const AdminUsersPage: React.FC = () => {
     if (result.success) await load();
   };
 
-  return <div className="container">
-    <h2>Quản trị tài khoản</h2>
-    <p style={{ color: '#94a3b8' }}>Tạo tài khoản, phân vai trò, cập nhật thông tin hoặc vô hiệu hóa. Vô hiệu hóa sẽ thu hồi phiên đăng nhập và giữ nguyên dữ liệu học tập.</p>
-    {message && <p role="status">{message}</p>}
+  return <div className="container" style={{ maxWidth: 1200 }}>
+    <div style={{ marginBottom: '1rem' }}><Link to="/admin">← Quay lại Tổng quan</Link></div>
+    <div style={{ marginBottom: '1.5rem' }}>
+      <h2>Quản lý tài khoản</h2>
+      <p style={{ color: 'var(--text-secondary)' }}>Tạo tài khoản, phân vai trò và quản lý trạng thái truy cập. Dữ liệu học tập được giữ lại khi vô hiệu hóa tài khoản.</p>
+    </div>
+    {message && <p role="status" style={{ color: message.startsWith('Đã ') ? '#34d399' : '#fca5a5' }}>{message}</p>}
     <div className="card" style={{ margin: '1rem 0' }}>
       <h3>{editing ? 'Cập nhật tài khoản' : 'Tạo tài khoản'}</h3>
       <form onSubmit={save} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.75rem', alignItems: 'end' }}>
@@ -74,7 +78,7 @@ export const AdminUsersPage: React.FC = () => {
     </div>
     <div className="card">
       {loading ? <p>Đang tải…</p> : <div style={{ overflowX: 'auto' }}><table className="table"><thead><tr><th>Họ tên</th><th>Email</th><th>Vai trò</th><th>Trạng thái</th><th>Ngày tạo</th><th>Thao tác</th></tr></thead><tbody>
-        {users.map(account => <tr key={account.id}><td>{account.fullName}</td><td>{account.email}</td><td>{account.role}</td><td>{account.isActive ? 'Hoạt động' : 'Đã vô hiệu hóa'}</td><td>{new Date(account.createdAt).toLocaleDateString('vi-VN')}</td><td style={{ display: 'flex', gap: '0.4rem' }}><button className="btn btn-secondary btn-sm" onClick={() => startEdit(account)}>Sửa</button>{account.isActive ? <button className="btn btn-ghost-danger btn-sm" disabled={account.id === currentUser?.id} onClick={() => setPendingDeactivate(account)}>Vô hiệu hóa</button> : <button className="btn btn-secondary btn-sm" onClick={() => activate(account)}>Kích hoạt</button>}</td></tr>)}
+        {users.map(account => <tr key={account.id}><td>{account.fullName}</td><td>{account.email}</td><td><span className="badge badge-blue">{account.role}</span></td><td><span className={`badge ${account.isActive ? 'badge-green' : 'badge-red'}`}>{account.isActive ? 'Hoạt động' : 'Đã vô hiệu hóa'}</span></td><td>{new Date(account.createdAt).toLocaleDateString('vi-VN')}</td><td style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}><button className="btn btn-secondary btn-sm" onClick={() => startEdit(account)}>Sửa</button>{account.isActive ? <button className="btn btn-ghost-danger btn-sm" disabled={account.id === currentUser?.id} onClick={() => setPendingDeactivate(account)}>Vô hiệu hóa</button> : <button className="btn btn-secondary btn-sm" onClick={() => activate(account)}>Kích hoạt</button>}</td></tr>)}
       </tbody></table></div>}
     </div>
     <ConfirmDialog open={!!pendingDeactivate} title="Vô hiệu hóa tài khoản?" description={pendingDeactivate ? `${pendingDeactivate.fullName} (${pendingDeactivate.email}) sẽ không thể đăng nhập; các phiên hiện tại bị thu hồi. Bài nộp và dữ liệu lớp học vẫn được giữ.` : ''} confirmLabel="Vô hiệu hóa" busy={deactivating} onConfirm={deactivate} onCancel={() => setPendingDeactivate(null)} />

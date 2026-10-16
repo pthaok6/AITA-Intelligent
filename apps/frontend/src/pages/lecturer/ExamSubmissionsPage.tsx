@@ -128,30 +128,6 @@ export const ExamSubmissionsPage: React.FC = () => {
     }
   };
 
-  const handleRemoveMember = async (teamId: string, studentId: string) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa sinh viên này khỏi nhóm?')) return;
-    const res = await apiRequest(`/teams/${teamId}/members/${studentId}`, { method: 'DELETE' });
-    if (res.success) {
-      const teamRes = await apiRequest(`/exams/${selectedExamId}/teams`);
-      if (teamRes.success && teamRes.data) setTeams(teamRes.data);
-    } else {
-      setError(res.message || 'Không thể xóa thành viên khỏi nhóm.');
-    }
-  };
-
-  const handleChangeLeader = async (teamId: string, newLeaderStudentId: string) => {
-    const res = await apiRequest(`/teams/${teamId}/leader`, {
-      method: 'PUT',
-      body: JSON.stringify({ newLeaderStudentId, reason: 'Giảng viên chỉ định Trưởng nhóm mới (BR-13)' }),
-    });
-    if (res.success) {
-      const teamRes = await apiRequest(`/exams/${selectedExamId}/teams`);
-      if (teamRes.success && teamRes.data) setTeams(teamRes.data);
-    } else {
-      setError(res.message || 'Không thể đổi Trưởng nhóm.');
-    }
-  };
-
   const handleDeleteTeam = async (teamId: string, teamName: string) => {
     if (!window.confirm(`Bạn có chắc chắn muốn xóa nhóm "${teamName}"?`)) return;
     setDeletingTeamId(teamId);
@@ -328,7 +304,7 @@ export const ExamSubmissionsPage: React.FC = () => {
                 <div>
                   <h3 className="team-analysis-title">Phân tích đóng góp Git và điểm cá nhân</h3>
                   <p className="team-analysis-description">
-                    Tự động tính tỷ lệ đóng góp Git commits/LOC, cảnh báo Free-rider &lt; 5% (BR-05) và tính điểm cá nhân phái sinh từ điểm nhóm (BR-12).
+                    Tỷ lệ đóng góp Git commits/LOC và điểm cá nhân được tính từ kết quả bài nộp nhóm (BR-12).
                   </p>
                 </div>
               </div>
@@ -402,9 +378,7 @@ export const ExamSubmissionsPage: React.FC = () => {
                                 <th>GitHub</th>
                                 <th>Commits / LOC</th>
                                 <th>% Đóng góp</th>
-                                <th>Cảnh báo Free-rider (BR-05)</th>
                                 <th>Điểm cá nhân (BR-12 / Chấm tay)</th>
-                                <th>Thao tác</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -452,18 +426,9 @@ export const ExamSubmissionsPage: React.FC = () => {
                                         <div>
                                           <strong>{contrib.contributionPercent}%</strong>
                                           <div style={{ background: '#334155', height: '6px', borderRadius: '3px', marginTop: '4px', width: '100px' }}>
-                                            <div style={{ background: contrib.isWarning ? '#ef4444' : '#3b82f6', height: '100%', width: `${Math.min(100, contrib.contributionPercent)}%`, borderRadius: '3px' }} />
+                                            <div style={{ background: '#3b82f6', height: '100%', width: `${Math.min(100, contrib.contributionPercent)}%`, borderRadius: '3px' }} />
                                           </div>
                                         </div>
-                                      ) : '-'}
-                                    </td>
-                                    <td>
-                                      {contrib?.isWarning ? (
-                                        <span className="badge badge-red">
-                                          ⚠️ Dưới 5% (Free-rider)
-                                        </span>
-                                      ) : contrib ? (
-                                        <span className="badge badge-green">Đạt yêu cầu</span>
                                       ) : '-'}
                                     </td>
                                     <td style={{ minWidth: '130px' }}>
@@ -495,24 +460,6 @@ export const ExamSubmissionsPage: React.FC = () => {
                                           >Sửa điểm</button>
                                         </div>
                                       )}
-                                    </td>
-                                    <td style={{ whiteSpace: 'nowrap' }}>
-                                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                                        {m.role !== 'LEADER' && (
-                                          <button
-                                            className="btn btn-warning btn-sm"
-                                            title="Chỉ định bạn này làm Trưởng nhóm (Leader) theo BR-13"
-                                            onClick={() => handleChangeLeader(team.id, m.studentId)}
-                                          >
-                                             Đặt Leader
-                                          </button>
-                                        )}
-                                        <button
-                                          className="btn btn-ghost-danger btn-sm"
-                                          title="Xóa thành viên khỏi nhóm"
-                                          onClick={() => handleRemoveMember(team.id, m.studentId)}
-                                        >Xóa</button>
-                                      </div>
                                     </td>
                                   </tr>
                                 );

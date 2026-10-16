@@ -19,7 +19,7 @@ examRouter.get('/class/:classId', authenticateJwt, async (req: AuthRequest, res:
 });
 
 // Giảng viên tạo đề thi
-examRouter.post('/', authenticateJwt, requireRoles(UserRole.LECTURER, UserRole.ADMIN), async (req: AuthRequest, res: Response) => {
+examRouter.post('/', authenticateJwt, requireRoles(UserRole.LECTURER), async (req: AuthRequest, res: Response) => {
   try {
     const { classId, title, descriptionMd, allowedLanguage, examType, timeLimitMs, memoryLimitMb, startTime, endTime, testCases } = req.body;
     if (!classId || !title || !descriptionMd || !startTime || !endTime) {
