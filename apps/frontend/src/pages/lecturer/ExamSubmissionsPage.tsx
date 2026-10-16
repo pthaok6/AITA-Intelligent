@@ -304,7 +304,7 @@ export const ExamSubmissionsPage: React.FC = () => {
                 <div>
                   <h3 className="team-analysis-title">Phân tích đóng góp Git và điểm cá nhân</h3>
                   <p className="team-analysis-description">
-                    Tỷ lệ đóng góp Git commits/LOC và điểm cá nhân được tính từ kết quả bài nộp nhóm (BR-12).
+                    Tỷ lệ đóng góp Git (commit và dòng mã) được dùng để phân bổ điểm cá nhân từ điểm nhóm.
                   </p>
                 </div>
               </div>
@@ -378,7 +378,7 @@ export const ExamSubmissionsPage: React.FC = () => {
                                 <th>GitHub</th>
                                 <th>Commits / LOC</th>
                                 <th>% Đóng góp</th>
-                                <th>Điểm cá nhân (BR-12 / Chấm tay)</th>
+                                <th>Điểm cá nhân / Chấm tay</th>
                               </tr>
                             </thead>
                             <tbody>
