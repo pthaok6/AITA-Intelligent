@@ -58,7 +58,7 @@ export const MyAppealsPage: React.FC = () => {
   const countRejected = appeals.filter(a => a.status === 'REJECTED').length;
 
   return (
-    <div className="container" style={{ maxWidth: 1100 }}>
+    <div className="container page-appeals" style={{ maxWidth: 1100 }}>
       <div style={{ marginBottom: '1rem' }}>
         <Link to="/student">← Quay lại Dashboard Sinh viên</Link>
       </div>

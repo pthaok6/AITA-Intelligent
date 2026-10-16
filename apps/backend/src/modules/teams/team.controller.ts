@@ -6,12 +6,28 @@ import { HttpError } from '../../shared/http';
 
 export const teamRouter = Router();
 
-// LECTURER: Create a team for a group exam
-teamRouter.post('/exams/:examId/teams', authenticateJwt, requireRoles('LECTURER', 'ADMIN'), async (req: AuthRequest, res: Response, next) => {
+async function authorizeTeamManagement(teamId: string, user: NonNullable<AuthRequest['user']>) {
+  if (user.role === 'LECTURER' || user.role === 'ADMIN') return;
+  const team = await teamRepository.findTeamById(teamId);
+  if (!team) throw new HttpError(404, 'Không tìm thấy nhóm.');
+  if (user.role !== 'STUDENT' || !team.members.some(member => member.studentId === user.userId && member.role === 'LEADER')) {
+    throw new HttpError(403, 'Chỉ trưởng nhóm mới có thể quản lý thành viên.');
+  }
+}
+
+// Lecturer-created teams, or student-created teams with the creator assigned as leader.
+teamRouter.post('/exams/:examId/teams', authenticateJwt, async (req: AuthRequest, res: Response, next) => {
   try {
     const examId = req.params.examId as string;
     const { name, repoUrl } = req.body;
-    const team = await teamService.createTeam(examId, name, repoUrl);
+    let team: any;
+    if (req.user!.role === 'STUDENT') {
+      team = await teamService.createStudentTeam(examId, req.user!.userId, name);
+    } else if (req.user!.role === 'LECTURER' || req.user!.role === 'ADMIN') {
+      team = await teamService.createTeam(examId, name, repoUrl);
+    } else {
+      throw new HttpError(403, 'Bạn không có quyền tạo nhóm.');
+    }
     res.status(201).json({ success: true, data: team });
   } catch (error) { next(error); }
 });
@@ -44,22 +60,45 @@ teamRouter.get('/exams/:examId/my-team', authenticateJwt, async (req: AuthReques
   } catch (error) { next(error); }
 });
 
+// GET all teams the current student belongs to
+teamRouter.get('/teams/my', authenticateJwt, async (req: AuthRequest, res: Response, next) => {
+  try {
+    const teams = await teamRepository.findTeamsByStudent(req.user!.userId);
+    res.status(200).json({ success: true, data: teams });
+  } catch (error) { next(error); }
+});
+
 // ADD member to team
-teamRouter.post('/teams/:teamId/members', authenticateJwt, requireRoles('LECTURER', 'ADMIN'), async (req: AuthRequest, res: Response, next) => {
+teamRouter.post('/teams/:teamId/members', authenticateJwt, async (req: AuthRequest, res: Response, next) => {
   try {
     const teamId = req.params.teamId as string;
     const { studentId, role, githubUsername } = req.body;
     if (!studentId) throw new HttpError(400, 'studentId không được để trống.');
-    const member = await teamService.addMember(teamId, studentId, role, githubUsername);
+    await authorizeTeamManagement(teamId, req.user!);
+    const assignedRole = req.user!.role === 'STUDENT' ? 'MEMBER' : role;
+    const member = await teamService.addMember(teamId, studentId, assignedRole, githubUsername);
     res.status(201).json({ success: true, data: member });
   } catch (error) { next(error); }
 });
 
+teamRouter.get('/teams/:teamId/candidates', authenticateJwt, async (req: AuthRequest, res: Response, next) => {
+  try {
+    const teamId = req.params.teamId as string;
+    await authorizeTeamManagement(teamId, req.user!);
+    const candidates = await teamService.getTeamCandidates(teamId);
+    res.status(200).json({ success: true, data: candidates });
+  } catch (error) { next(error); }
+});
+
 // REMOVE member from team
-teamRouter.delete('/teams/:teamId/members/:studentId', authenticateJwt, requireRoles('LECTURER', 'ADMIN'), async (req: AuthRequest, res: Response, next) => {
+teamRouter.delete('/teams/:teamId/members/:studentId', authenticateJwt, async (req: AuthRequest, res: Response, next) => {
   try {
     const teamId = req.params.teamId as string;
     const studentId = req.params.studentId as string;
+    await authorizeTeamManagement(teamId, req.user!);
+    if (req.user!.role === 'STUDENT' && req.user!.userId === studentId) {
+      throw new HttpError(400, 'Không thể tự xóa mình khỏi nhóm này.');
+    }
     await teamService.removeMember(teamId, studentId);
     res.status(200).json({ success: true, message: 'Đã xóa thành viên khỏi nhóm.' });
   } catch (error) { next(error); }
@@ -82,6 +121,14 @@ teamRouter.put('/teams/:teamId/repo', authenticateJwt, async (req: AuthRequest, 
     const teamId = req.params.teamId as string;
     const { repoUrl } = req.body;
     if (!repoUrl) throw new HttpError(400, 'repoUrl không được để trống.');
+    const isLecturer = req.user!.role === 'LECTURER' || req.user!.role === 'ADMIN';
+    if (!isLecturer) {
+      const team = await teamRepository.findTeamById(teamId);
+      if (!team) throw new HttpError(404, 'Không tìm thấy nhóm.');
+      if (!team.members.some(member => member.studentId === req.user!.userId)) {
+        throw new HttpError(403, 'Bạn không thuộc nhóm này nên không thể cập nhật repository.');
+      }
+    }
     const team = await teamService.updateRepoUrl(teamId, repoUrl);
     res.status(200).json({ success: true, data: team });
   } catch (error) { next(error); }
@@ -95,7 +142,12 @@ teamRouter.put('/teams/:teamId/members/:studentId/github', authenticateJwt, asyn
     const { githubUsername } = req.body;
     const isLecturer = req.user!.role === 'LECTURER' || req.user!.role === 'ADMIN';
     if (!isLecturer && req.user!.userId !== studentId) {
-      throw new HttpError(403, 'Bạn chỉ có thể cập nhật GitHub username của chính mình.');
+      const team = await teamRepository.findTeamById(teamId);
+      if (!team) throw new HttpError(404, 'Không tìm thấy nhóm.');
+      if (!team.members.some(member => member.studentId === studentId)) throw new HttpError(404, 'Thành viên không thuộc nhóm này.');
+      if (!team.members.some(member => member.studentId === req.user!.userId && member.role === 'LEADER')) {
+        throw new HttpError(403, 'Chỉ trưởng nhóm mới có thể cập nhật GitHub username của thành viên khác.');
+      }
     }
     const member = await teamService.updateMemberGithub(teamId, studentId, (githubUsername || '').trim());
     res.status(200).json({ success: true, data: member });

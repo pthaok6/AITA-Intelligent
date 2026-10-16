@@ -14,25 +14,25 @@ export const Navbar: React.FC = () => {
   };
 
   return (
-    <header style={{ background: '#111827', borderBottom: '1px solid #1f2937', padding: '0.8rem 1.5rem' }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <Link to="/" style={{ fontWeight: 'bold', fontSize: '1.25rem', color: '#60a5fa', textDecoration: 'none' }}>
+    <header className="app-header">
+      <div className="app-header-inner">
+        <div className="app-brand-group">
+          <Link to="/" className="app-brand">
              AITA Platform
           </Link>
           {isAuthenticated && (
-            <span style={{ fontSize: '0.85rem', color: '#9ca3af' }}>
+            <span className="app-role-label">
               {user?.role === 'ADMIN' ? 'Quản trị Portal' : user?.role === 'LECTURER' ? 'Giảng viên Portal' : 'Sinh viên Portal'}
             </span>
           )}
         </div>
 
-        <div>
+        <div className="app-header-actions">
           {logoutError && <p role="alert">{logoutError}</p>}
           {isAuthenticated ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div className="app-account-actions">
               {user?.role === 'ADMIN' && <Link to="/admin/users" className="btn btn-secondary btn-sm">Quản lý tài khoản</Link>}
-              <span style={{ fontSize: '0.875rem' }}>
+              <span className="app-user-label">
                 {user?.fullName} <span className="badge badge-blue">{user?.role}</span>
               </span>
               <button onClick={handleLogout} className="btn btn-secondary btn-sm">
@@ -40,7 +40,7 @@ export const Navbar: React.FC = () => {
               </button>
             </div>
           ) : (
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <div className="app-account-actions">
               <Link to="/login" className="btn btn-secondary btn-sm">Đăng nhập</Link>
               <Link to="/register" className="btn btn-primary btn-sm">Đăng ký</Link>
             </div>

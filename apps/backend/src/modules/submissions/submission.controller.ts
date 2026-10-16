@@ -9,14 +9,14 @@ import { archivePath, ZIP_LIMIT } from '../../infrastructure/storage/submission-
 import { prisma } from '../../infrastructure/database/prisma';
 
 export const submissionRouter = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: ZIP_LIMIT, files: 1, fields: 1, fieldSize: 512, parts: 2 },
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: ZIP_LIMIT, files: 1, fields: 2, fieldSize: 512, parts: 3 },
   fileFilter: (_req, file, done) => /\.zip$/i.test(file.originalname) ? done(null, true) : done(new HttpError(400, 'Chỉ nhận bài nộp .zip.')) });
 
 submissionRouter.post('/exams/:examId/submissions', authenticateJwt,
   asyncRoute(async (req: AuthRequest, _res, next) => { await submissionService.authorizeSubmission(String(req.params.examId), req.user!.userId); next(); }),
   upload.single('file'), asyncRoute(async (req: AuthRequest, res) => {
     if (!req.file) throw new HttpError(400, 'Gửi ZIP ở trường file, dùng multipart/form-data.');
-    const submission = await submissionService.submitArchive(String(req.params.examId), req.user!.userId, req.file.buffer, req.file.originalname, req.body.entrypoint);
+    const submission = await submissionService.submitArchive(String(req.params.examId), req.user!.userId, req.file.buffer, req.file.originalname, req.body.entrypoint, req.body.repoUrl);
     res.status(201).json({ success: true, data: {
       id: submission.id, examId: submission.examId, submittedAt: submission.submittedAt,
       status: submission.status, scoreReleased: false,

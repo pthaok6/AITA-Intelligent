@@ -16,6 +16,7 @@ const POPULAR_TOPICS = [
   'Danh sách liên kết (Linked List)',
   'Kỹ thuật Hai con trỏ (Two Pointers)',
 ];
+const CUSTOM_TOPIC_OPTION = '__CUSTOM_TOPIC__';
 
 export const CreateExamPage: React.FC = () => {
   const { classId } = useParams<{ classId: string }>();
@@ -216,7 +217,7 @@ export const CreateExamPage: React.FC = () => {
   };
 
   return (
-    <div className="container" style={{ maxWidth: '900px' }}>
+    <div className="container page-exam-create" style={{ maxWidth: '900px' }}>
       <div style={{ marginBottom: '1rem' }}>
         <Link to="/lecturer">← Quay lại Dashboard</Link>
       </div>
@@ -226,9 +227,8 @@ export const CreateExamPage: React.FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
-              <span className="ai-badge">GENAI CORE · PHÂN HỆ 3</span>
               <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#f8fafc' }}>
-                ✨ AI Soạn Đề Bài & Tự Sinh Barem Điểm
+                AI Soạn Đề Bài & Tự Sinh Barem Điểm
               </h3>
             </div>
             <p style={{ margin: '0 0 0.5rem', fontSize: '0.875rem', color: '#cbd5e1' }}>
@@ -252,36 +252,30 @@ export const CreateExamPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Quick Topic Chips */}
-        <div style={{ marginBottom: '1rem' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Gợi ý chủ đề thuật toán nhanh:
-          </span>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.4rem' }}>
-            {POPULAR_TOPICS.map((topic) => (
-              <button
-                key={topic}
-                type="button"
-                className={`topic-chip ${aiTopic === topic ? 'active' : ''}`}
-                onClick={() => setAiTopic(topic)}
-              >
-                {topic}
-              </button>
-            ))}
-          </div>
-        </div>
-
         {/* Form controls for AI */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
           <div>
-            <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '0.25rem' }}>Chủ đề bài toán</label>
-            <input
-              type="text"
+            <label htmlFor="ai-topic" style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '0.25rem' }}>Chủ đề bài toán</label>
+            <select
+              id="ai-topic"
               className="form-control"
-              value={aiTopic}
-              onChange={(e) => setAiTopic(e.target.value)}
-              placeholder="Nhập chủ đề tùy ý..."
-            />
+              value={POPULAR_TOPICS.includes(aiTopic) ? aiTopic : CUSTOM_TOPIC_OPTION}
+              onChange={(e) => setAiTopic(e.target.value === CUSTOM_TOPIC_OPTION ? '' : e.target.value)}
+            >
+              {POPULAR_TOPICS.map((topic) => <option key={topic} value={topic}>{topic}</option>)}
+              <option value={CUSTOM_TOPIC_OPTION}>Chủ đề khác...</option>
+            </select>
+            {!POPULAR_TOPICS.includes(aiTopic) && (
+              <input
+                type="text"
+                className="form-control"
+                style={{ marginTop: '0.5rem' }}
+                value={aiTopic}
+                onChange={(e) => setAiTopic(e.target.value)}
+                placeholder="Nhập chủ đề tùy ý..."
+                aria-label="Nhập chủ đề bài toán khác"
+              />
+            )}
           </div>
           <div>
             <label style={{ fontSize: '0.75rem', color: '#94a3b8', display: 'block', marginBottom: '0.25rem' }}>Độ khó</label>
@@ -326,20 +320,18 @@ export const CreateExamPage: React.FC = () => {
           <button
             type="button"
             className="btn btn-primary"
-            style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)', border: 'none', fontWeight: 600 }}
             disabled={generatingAi}
             onClick={handleAiGenerateExam}
           >
-            {generatingAi ? '⏳ AI đang soạn đề bài & test case...' : '✨ AI Soạn Đề Bài & Sinh Barem'}
+            {generatingAi ? ' AI đang soạn đề bài & test case...' : ' AI Soạn Đề Bài & Sinh Barem'}
           </button>
           <button
             type="button"
             className="btn btn-secondary"
-            style={{ borderColor: '#6366f1', color: '#c7d2fe' }}
             disabled={generatingRubric}
             onClick={handleAiGenerateRubric}
           >
-            {generatingRubric ? '⏳ AI đang sinh barem...' : '📋 AI Tự Sinh Lại Barem Điểm'}
+            {generatingRubric ? ' AI đang sinh barem...' : ' AI Tự Sinh Lại Barem Điểm'}
           </button>
         </div>
 
@@ -470,7 +462,7 @@ export const CreateExamPage: React.FC = () => {
           </div>
 
           {testCases.map((tc, idx) => (
-            <div key={idx} style={{ background: '#090d16', border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem', marginBottom: '1rem' }}>
+            <div key={idx} className="exam-test-case" style={{ borderRadius: '0.5rem', padding: '1rem', marginBottom: '1rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
                 <span style={{ fontWeight: 600, fontSize: '0.875rem', color: tc.isHidden ? '#f59e0b' : '#38bdf8' }}>
                   Test case #{idx + 1} {tc.isHidden ? '(Test Ẩn)' : '(Công khai)'}
@@ -530,7 +522,7 @@ export const CreateExamPage: React.FC = () => {
           ))}
 
           <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem', padding: '0.85rem', fontSize: '1rem' }} disabled={submitting}>
-            {submitting ? 'Đang lưu đề thi...' : '🚀 Lưu & Kích hoạt Bài Thi'}
+            {submitting ? 'Đang lưu đề thi...' : ' Lưu & Kích hoạt Bài Thi'}
           </button>
         </form>
       </div>

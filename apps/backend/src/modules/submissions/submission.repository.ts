@@ -14,12 +14,16 @@ export class SubmissionRepository {
     originalFilename?: string;
     entrypoint?: string;
     sourceFiles?: Array<{ path: string; size: number }>;
+    teamRepoUrl?: string;
   }) {
-    const { sourceFiles, ...submissionData } = data;
+    const { sourceFiles, teamRepoUrl, ...submissionData } = data;
     for (let retry = 0; ; retry++) {
       try {
         return await prisma.$transaction(async tx => {
           const latest = await tx.submission.findFirst({ where: { examId: data.examId, studentId: data.studentId }, orderBy: { attemptNumber: 'desc' }, select: { attemptNumber: true } });
+          if (teamRepoUrl && data.teamId) {
+            await tx.team.update({ where: { id: data.teamId }, data: { repoUrl: teamRepoUrl } });
+          }
           return tx.submission.create({
             data: {
               ...submissionData,

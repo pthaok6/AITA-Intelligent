@@ -280,7 +280,7 @@ export const ExamSubmissionsPage: React.FC = () => {
                 onClick={() => setSelectedExamId(ex.id)}
                 className={`btn ${selectedExamId === ex.id ? 'btn-primary' : 'btn-secondary'}`}
               >
-                {ex.title} {ex.examType === 'GROUP' && '👥 (Nhóm)'}
+                {ex.title} {ex.examType === 'GROUP' && ' (Nhóm)'}
               </button>
             ))}
           </div>
@@ -323,11 +323,11 @@ export const ExamSubmissionsPage: React.FC = () => {
 
           {/* SECTION: GROUP TEAMS & GIT ANALYTICS (UC19, UC20, BR-05, BR-12) */}
           {selectedExam?.examType === 'GROUP' && (
-            <div className="card" style={{ marginBottom: '1.5rem', borderLeft: '4px solid #3b82f6' }}>
+            <div className="card team-analysis-panel">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
-                  <h3 style={{ margin: 0 }}>👥 Phân tích Đóng góp Git & Điểm Cá nhân (UC19, BR-12)</h3>
-                  <p style={{ margin: '0.25rem 0 0', fontSize: '0.875rem', color: '#94a3b8' }}>
+                  <h3 className="team-analysis-title">Phân tích đóng góp Git và điểm cá nhân</h3>
+                  <p className="team-analysis-description">
                     Tự động tính tỷ lệ đóng góp Git commits/LOC, cảnh báo Free-rider &lt; 5% (BR-05) và tính điểm cá nhân phái sinh từ điểm nhóm (BR-12).
                   </p>
                 </div>
@@ -336,22 +336,20 @@ export const ExamSubmissionsPage: React.FC = () => {
               {teams.length === 0 ? (
                 <p style={{ color: '#94a3b8', marginTop: '1rem' }}>Chưa có nhóm nào được tạo cho bài kiểm tra này. Hãy bấm "+ Thêm nhóm mới" ở trên.</p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', marginTop: '1rem' }}>
+                <div className="team-analysis-list">
                   {teams.map(team => {
                     const latestSub = team.submissions?.[0];
                     return (
-                      <div key={team.id} style={{ background: '#0f172a', padding: '1rem', borderRadius: '8px', border: '1px solid #334155' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                      <div key={team.id} className="team-analysis-card">
+                        <div className="team-analysis-card-header">
                           <div>
                             <strong style={{ fontSize: '1.1rem', color: '#f8fafc' }}>{team.name}</strong>
                             <button
+                              className="btn btn-ghost-danger btn-sm"
                               title="Xóa nhóm này"
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: '0.85rem', marginLeft: '0.5rem' }}
                               disabled={deletingTeamId === team.id}
                               onClick={() => handleDeleteTeam(team.id, team.name)}
-                            >
-                              🗑️
-                            </button>
+                            >Xóa</button>
                             {editingRepoUrl?.teamId === team.id ? (
                               <span style={{ marginLeft: '1rem', display: 'inline-flex', gap: '0.25rem', alignItems: 'center' }}>
                                 <input
@@ -361,25 +359,23 @@ export const ExamSubmissionsPage: React.FC = () => {
                                   onChange={e => setEditingRepoUrl({ teamId: team.id, repoUrl: e.target.value })}
                                   placeholder="https://github.com/owner/repo"
                                 />
-                                <button className="btn btn-primary btn-sm" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }} disabled={savingRepo} onClick={() => handleSaveRepo(team.id)}>Lưu</button>
-                                <button className="btn btn-secondary btn-sm" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }} onClick={() => setEditingRepoUrl(null)}>✕</button>
+                                <button className="btn btn-primary btn-sm" disabled={savingRepo} onClick={() => handleSaveRepo(team.id)}>Lưu</button>
+                                <button className="btn btn-secondary btn-sm" onClick={() => setEditingRepoUrl(null)}>Hủy</button>
                               </span>
                             ) : (
                               <span>
                                 {team.repoUrl ? (
                                   <a href={team.repoUrl} target="_blank" rel="noreferrer" style={{ marginLeft: '1rem', fontSize: '0.85rem', color: '#38bdf8' }}>
-                                    🔗 {team.repoUrl}
+                                    {team.repoUrl}
                                   </a>
                                 ) : (
                                   <span style={{ marginLeft: '1rem', fontSize: '0.85rem', color: '#64748b' }}>(Chưa gắn link repo)</span>
                                 )}
                                 <button
+                                  className="btn btn-secondary btn-sm"
                                   title="Sửa Link GitHub Repo"
-                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#38bdf8', fontSize: '0.8rem', marginLeft: '0.5rem' }}
                                   onClick={() => setEditingRepoUrl({ teamId: team.id, repoUrl: team.repoUrl || '' })}
-                                >
-                                  ✏️
-                                </button>
+                                >Sửa</button>
                               </span>
                             )}
                             <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.25rem' }}>
@@ -387,12 +383,11 @@ export const ExamSubmissionsPage: React.FC = () => {
                             </div>
                           </div>
                           <button
-                            className="btn btn-secondary btn-sm"
+                            className="btn btn-primary btn-sm"
                             disabled={syncingGit === team.id}
                             onClick={() => handleSyncGit(team.id)}
-                            style={{ background: '#0284c7', color: '#fff' }}
                           >
-                            {syncingGit === team.id ? 'Đang đồng bộ...' : '⚡ Đồng bộ Git & Tính điểm (BR-12)'}
+                            {syncingGit === team.id ? 'Đang đồng bộ...' : 'Đồng bộ Git và tính điểm'}
                           </button>
                         </div>
 
@@ -437,19 +432,17 @@ export const ExamSubmissionsPage: React.FC = () => {
                                             placeholder="GitHub username"
                                             autoFocus
                                           />
-                                          <button className="btn btn-primary btn-sm" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }} disabled={savingGithub} onClick={() => handleSaveGithub(team.id, m.studentId)}>Lưu</button>
-                                          <button className="btn btn-secondary btn-sm" style={{ padding: '0.2rem 0.5rem', fontSize: '0.75rem' }} onClick={() => setEditingMemberGithub(null)}>✕</button>
+                                          <button className="btn btn-primary btn-sm" disabled={savingGithub} onClick={() => handleSaveGithub(team.id, m.studentId)}>Lưu</button>
+                                          <button className="btn btn-secondary btn-sm" onClick={() => setEditingMemberGithub(null)}>Hủy</button>
                                         </div>
                                       ) : (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                           <span>{m.githubUsername || <span style={{ color: '#64748b' }}>Chưa cập nhật</span>}</span>
                                           <button
+                                            className="btn btn-secondary btn-sm"
                                             title="Sửa GitHub username"
-                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#38bdf8', fontSize: '0.8rem', padding: '0 2px' }}
                                             onClick={() => setEditingMemberGithub({ teamId: team.id, studentId: m.studentId, username: m.githubUsername || '' })}
-                                          >
-                                            ✏️
-                                          </button>
+                                          >Sửa</button>
                                         </div>
                                       )}
                                     </td>
@@ -466,7 +459,7 @@ export const ExamSubmissionsPage: React.FC = () => {
                                     </td>
                                     <td>
                                       {contrib?.isWarning ? (
-                                        <span className="badge badge-danger" style={{ background: '#991b1b', color: '#fecaca' }}>
+                                        <span className="badge badge-red">
                                           ⚠️ Dưới 5% (Free-rider)
                                         </span>
                                       ) : contrib ? (
@@ -487,8 +480,8 @@ export const ExamSubmissionsPage: React.FC = () => {
                                             onChange={e => setEditingMemberScore({ teamId: team.id, studentId: m.studentId, score: e.target.value })}
                                             autoFocus
                                           />
-                                          <button className="btn btn-primary btn-sm" style={{ padding: '0.2rem 0.4rem', fontSize: '0.75rem' }} disabled={savingScore} onClick={() => handleSaveScore(team.id, m.studentId)}>Lưu</button>
-                                          <button className="btn btn-secondary btn-sm" style={{ padding: '0.2rem 0.4rem', fontSize: '0.75rem' }} onClick={() => setEditingMemberScore(null)}>✕</button>
+                                          <button className="btn btn-primary btn-sm" disabled={savingScore} onClick={() => handleSaveScore(team.id, m.studentId)}>Lưu</button>
+                                          <button className="btn btn-secondary btn-sm" onClick={() => setEditingMemberScore(null)}>Hủy</button>
                                         </div>
                                       ) : (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -496,12 +489,10 @@ export const ExamSubmissionsPage: React.FC = () => {
                                             {(contrib && contrib.personalScore != null) ? `${contrib.personalScore} pts` : latestSub?.status === 'COMPLETED' ? 'Chưa tính' : '-'}
                                           </span>
                                           <button
+                                            className="btn btn-secondary btn-sm"
                                             title="Chấm điểm thủ công / Ghi đè điểm cho SV này"
-                                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#f59e0b', fontSize: '0.8rem', padding: '0 2px' }}
                                             onClick={() => setEditingMemberScore({ teamId: team.id, studentId: m.studentId, score: String(contrib?.personalScore != null ? contrib.personalScore : (latestSub?.totalScore || 0)) })}
-                                          >
-                                            ✏️
-                                          </button>
+                                          >Sửa điểm</button>
                                         </div>
                                       )}
                                     </td>
@@ -509,22 +500,18 @@ export const ExamSubmissionsPage: React.FC = () => {
                                       <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                                         {m.role !== 'LEADER' && (
                                           <button
-                                            className="btn btn-secondary btn-sm"
-                                            style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', background: '#d97706', color: '#fff', border: 'none' }}
+                                            className="btn btn-warning btn-sm"
                                             title="Chỉ định bạn này làm Trưởng nhóm (Leader) theo BR-13"
                                             onClick={() => handleChangeLeader(team.id, m.studentId)}
                                           >
-                                            👑 Đặt Leader
+                                             Đặt Leader
                                           </button>
                                         )}
                                         <button
                                           className="btn btn-ghost-danger btn-sm"
-                                          style={{ fontSize: '0.75rem', padding: '0.2rem 0.4rem' }}
                                           title="Xóa thành viên khỏi nhóm"
                                           onClick={() => handleRemoveMember(team.id, m.studentId)}
-                                        >
-                                          🗑️
-                                        </button>
+                                        >Xóa</button>
                                       </div>
                                     </td>
                                   </tr>

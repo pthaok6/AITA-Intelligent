@@ -21,6 +21,31 @@ export class TeamService {
     return this.teamRepo.createTeam(examId, name.trim(), repoUrl?.trim() || undefined);
   }
 
+  async createStudentTeam(examId: string, studentId: string, name: string) {
+    if (!name || !name.trim()) throw new HttpError(400, 'Tên nhóm không được để trống.');
+    const exam = await prisma.exam.findUnique({ where: { id: examId }, select: { id: true, classId: true, examType: true } });
+    if (!exam) throw new HttpError(404, 'Không tìm thấy bài thi.');
+    if (exam.examType !== 'GROUP') throw new HttpError(400, 'Chỉ có thể tạo nhóm cho bài thi nhóm.');
+
+    const enrollment = await prisma.classEnrollment.findUnique({
+      where: { classId_studentId: { classId: exam.classId, studentId } },
+    });
+    if (!enrollment || enrollment.status !== 'ACTIVE') throw new HttpError(403, 'Bạn cần đang tham gia lớp để tạo nhóm cho bài thi này.');
+    const existingTeam = await this.teamRepo.findTeamByStudent(examId, studentId);
+    if (existingTeam) throw new HttpError(409, `Bạn đã thuộc nhóm "${existingTeam.name}" cho bài thi này.`);
+    const duplicateName = await prisma.team.findUnique({ where: { examId_name: { examId, name: name.trim() } } });
+    if (duplicateName) throw new HttpError(409, `Nhóm "${name.trim()}" đã tồn tại trong bài thi này.`);
+
+    return prisma.$transaction(async tx => {
+      const team = await tx.team.create({ data: { examId, name: name.trim() } });
+      await tx.teamMember.create({ data: { teamId: team.id, studentId, role: 'LEADER' } });
+      return tx.team.findUnique({
+        where: { id: team.id },
+        include: { members: { include: { student: { select: { id: true, fullName: true, email: true } } } } },
+      });
+    });
+  }
+
   async addMember(teamId: string, studentId: string, role: string = 'MEMBER', githubUsername?: string) {
     const team = await this.teamRepo.findTeamById(teamId);
     if (!team) throw new HttpError(404, 'Không tìm thấy nhóm.');
@@ -109,6 +134,19 @@ export class TeamService {
     const team = await this.teamRepo.findTeamById(teamId);
     if (!team) throw new HttpError(404, 'Không tìm thấy nhóm.');
     return team;
+  }
+
+  async getTeamCandidates(teamId: string) {
+    const team = await this.getTeamById(teamId);
+    const [enrollments, assignedMembers] = await Promise.all([
+      prisma.classEnrollment.findMany({
+        where: { classId: team.exam.classId, status: 'ACTIVE', student: { role: 'STUDENT', isActive: true } },
+        include: { student: { select: { id: true, fullName: true, email: true } } },
+      }),
+      prisma.teamMember.findMany({ where: { team: { examId: team.examId } }, select: { studentId: true } }),
+    ]);
+    const assignedStudentIds = new Set(assignedMembers.map(member => member.studentId));
+    return enrollments.filter(enrollment => !assignedStudentIds.has(enrollment.studentId)).map(enrollment => enrollment.student);
   }
 
   async deleteTeam(teamId: string) {

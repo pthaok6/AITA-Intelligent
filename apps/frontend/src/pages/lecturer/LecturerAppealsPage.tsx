@@ -136,7 +136,7 @@ export const LecturerAppealsPage: React.FC = () => {
   const countRejected = appeals.filter(a => a.status === 'REJECTED').length;
 
   return (
-    <div className="container" style={{ maxWidth: 1200 }}>
+    <div className="container page-appeals" style={{ maxWidth: 1200 }}>
       <div style={{ marginBottom: '1rem' }}>
         <Link to="/lecturer">← Quay lại Dashboard Giảng viên</Link>
       </div>
@@ -366,7 +366,7 @@ export const LecturerAppealsPage: React.FC = () => {
                   rel="noreferrer"
                   className="btn btn-secondary btn-sm"
                 >
-                  🔍 Mở xem chi tiết bài nộp & test case (Tab mới) &rarr;
+                   Mở xem chi tiết bài nộp & test case (Tab mới) &rarr;
                 </a>
               </div>
             </div>
@@ -382,7 +382,7 @@ export const LecturerAppealsPage: React.FC = () => {
                     className={`btn ${resolveAction === 'IN_REVIEW' ? 'btn-primary' : 'btn-secondary'}`}
                     style={{ fontSize: '0.85rem' }}
                   >
-                    🔍 Đang xem xét
+                     Đang xem xét
                   </button>
                   <button
                     type="button"
@@ -402,7 +402,7 @@ export const LecturerAppealsPage: React.FC = () => {
                     className={`btn ${resolveAction === 'REJECTED' ? 'btn-danger' : 'btn-secondary'}`}
                     style={{ fontSize: '0.85rem' }}
                   >
-                    ✕ Từ chối khiếu nại
+                     Từ chối khiếu nại
                   </button>
                 </div>
               </div>

@@ -40,15 +40,28 @@ export class SubmissionService {
     catch (error: any) { console.error('[Submission enqueue pending]', submission.id, error.message); return { ...submission, queuePending: true }; }
     return submission;
   }
-  async submitArchive(examId: string, studentId: string, bytes: Buffer, filename: string, entrypoint?: string) {
+  async submitArchive(examId: string, studentId: string, bytes: Buffer, filename: string, entrypoint?: string, repoUrl?: string) {
     if (entrypoint !== undefined && typeof entrypoint !== 'string') throw new HttpError(400, 'Entrypoint phải là chuỗi.');
     const { exam, teamId } = await this.authorizeSubmission(examId, studentId);
+    let teamRepoUrl: string | undefined;
+    if (teamId) {
+      if (typeof repoUrl !== 'string' || !repoUrl.trim()) throw new HttpError(400, 'Bài nộp nhóm cần có link repository GitHub.');
+      let parsedUrl: URL;
+      try { parsedUrl = new URL(repoUrl.trim()); }
+      catch { throw new HttpError(400, 'Link repository GitHub không hợp lệ.'); }
+      const pathParts = parsedUrl.pathname.split('/').filter(Boolean);
+      if (parsedUrl.protocol !== 'https:' || !['github.com', 'www.github.com'].includes(parsedUrl.hostname.toLowerCase()) || pathParts.length < 2) {
+        throw new HttpError(400, 'Link repository phải có dạng https://github.com/owner/repository.');
+      }
+      teamRepoUrl = parsedUrl.toString().replace(/\/$/, '');
+    }
     const bundle = selectBundle(await readZip(bytes), exam.allowedLanguage, entrypoint);
     const stored = await persistArchive(bytes);
     const submission = await this.submissionRepo.create({
       examId, studentId, teamId, sourceCodeUrl: stored.key, fileHashSha256: stored.hash,
       artifactType: 'ZIP', originalFilename: filename.slice(0, 200), entrypoint: bundle.entrypoint,
       sourceFiles: bundle.files.map(file => ({ path: file.path, size: file.data.length })),
+      teamRepoUrl,
     });
     return this.enqueue(submission);
   }

@@ -219,7 +219,7 @@ export const SubmissionResultPage: React.FC = () => {
           <Link to={isStudent ? '/student' : '/lecturer'}>← Quay lại Dashboard</Link>
           {isStudent && (
             <Link to="/student/appeals" className="btn btn-secondary btn-sm">
-              ⚖️ Xem tất cả khiếu nại của tôi &rarr;
+               Xem tất cả khiếu nại của tôi &rarr;
             </Link>
           )}
         </div>
@@ -227,11 +227,10 @@ export const SubmissionResultPage: React.FC = () => {
           <button
             type="button"
             className="btn btn-secondary btn-sm"
-            style={{ borderColor: '#6366f1', color: '#c7d2fe' }}
             disabled={triggeringAiReview}
             onClick={handleTriggerAiReview}
           >
-            {triggeringAiReview ? '⏳ Đang phân tích mã nguồn...' : '✨ Yêu cầu AI Review lại mã nguồn'}
+            {triggeringAiReview ? ' Đang phân tích mã nguồn...' : ' Yêu cầu AI Review lại mã nguồn'}
           </button>
         )}
       </div>
@@ -293,7 +292,7 @@ export const SubmissionResultPage: React.FC = () => {
           {submission.artifactType === 'ZIP' && (
             <div style={{ marginTop: '0.5rem' }}>
               <a href={'/api/submissions/' + id + '/archive'} className="btn btn-secondary btn-sm">
-                ⬇️ Tải ZIP bài nộp
+                 Tải ZIP bài nộp
               </a>
             </div>
           )}
@@ -318,7 +317,7 @@ export const SubmissionResultPage: React.FC = () => {
                 disabled={explainingError}
                 onClick={handleExplainError}
               >
-                {explainingError ? '⏳ Đang phân tích...' : '🤖 Nhờ AI Giải Nghĩa Lỗi'}
+                {explainingError ? ' Đang phân tích...' : ' Nhờ AI Giải Nghĩa Lỗi'}
               </button>
             )}
           </div>
@@ -497,7 +496,7 @@ export const SubmissionResultPage: React.FC = () => {
             <div>
               {!hasActiveAppeal ? (
                 <button onClick={handleOpenAppealModal} className="btn btn-primary btn-sm">
-                  ⚖️ Gửi khiếu nại điểm
+                   Gửi khiếu nại điểm
                 </button>
               ) : (
                 <span className="badge badge-yellow">Đã có khiếu nại đang chờ xử lý</span>

@@ -86,7 +86,7 @@ export const LecturerDashboard: React.FC = () => {
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
           <Link to="/lecturer/appeals" className="btn btn-secondary">
-            📬 Hộp thư khiếu nại
+             Hộp thư khiếu nại
           </Link>
           <button onClick={() => { setClassCode(''); setName(''); setSemester('SU26'); setShowCreateModal(true); }} className="btn btn-primary">
             + Tạo lớp học mới

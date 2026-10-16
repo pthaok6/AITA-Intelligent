@@ -50,9 +50,10 @@ export const StudentDashboard: React.FC = () => {
           <h2>Cổng Luyện Tập & Nộp Bài Sinh Viên</h2>
           <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Chọn bài thi thực hành được giao để làm bài và nhận kết quả chấm tự động tức thì</p>
         </div>
-        <Link to="/student/appeals" className="btn btn-secondary">
-          ⚖️ Đơn khiếu nại điểm của tôi
-        </Link>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {user?.role === 'STUDENT' && <Link to="/student/teams" className="btn btn-secondary">Nhóm của tôi</Link>}
+          <Link to="/student/appeals" className="btn btn-secondary">Đơn khiếu nại điểm của tôi</Link>
+        </div>
       </div>
 
       {user?.role === 'STUDENT' && <form onSubmit={joinClass} className="card" style={{ display: 'flex', gap: '0.75rem', alignItems: 'end', marginBottom: '1.5rem' }}>

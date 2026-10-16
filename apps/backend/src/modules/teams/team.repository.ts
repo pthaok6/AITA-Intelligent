@@ -58,6 +58,20 @@ export class TeamRepository {
     });
   }
 
+  async findTeamsByStudent(studentId: string) {
+    return prisma.team.findMany({
+      where: { members: { some: { studentId } } },
+      include: {
+        exam: { select: { id: true, title: true, classId: true, class: { select: { classCode: true, name: true } } } },
+        members: {
+          include: { student: { select: { id: true, fullName: true, email: true } } },
+          orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async addMember(teamId: string, studentId: string, role: string = 'MEMBER', githubUsername?: string) {
     return prisma.teamMember.create({
       data: { teamId, studentId, role, githubUsername },

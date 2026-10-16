@@ -17,6 +17,7 @@ import { ClassRosterPage } from './pages/lecturer/ClassRosterPage';
 import { MySubmissionsPage } from './pages/student/MySubmissionsPage';
 import { MyAppealsPage } from './pages/student/MyAppealsPage';
 import { LecturerAppealsPage } from './pages/lecturer/LecturerAppealsPage';
+import { MyTeamsPage } from './pages/student/MyTeamsPage';
 
 const RootRedirect: React.FC = () => {
   const { isAuthenticated, user, loading } = useAuth();
@@ -116,6 +117,7 @@ export const App: React.FC = () => {
                   </ProtectedRoute>
                 }
               />
+              <Route path="/student/teams" element={<ProtectedRoute allowedRoles={['STUDENT']}><MyTeamsPage /></ProtectedRoute>} />
               <Route
                 path="/student/exams/:examId/take"
                 element={
