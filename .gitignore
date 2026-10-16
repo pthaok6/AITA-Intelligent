@@ -1,5 +1,5 @@
-node_modules/
-dist/
+apps/backend/node_modules/
+apps/backend/dist/
 *.tsbuildinfo
 .env
 .env.*

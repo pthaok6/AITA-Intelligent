@@ -16,6 +16,7 @@ model User {
   avatarUrl    String?
   googleSubject String?          @unique
   isActive     Boolean           @default(true)
+  isApproved   Boolean           @default(true)
   createdAt    DateTime          @default(now())
 
   lecturedClasses Class[]        @relation("LecturerClasses")

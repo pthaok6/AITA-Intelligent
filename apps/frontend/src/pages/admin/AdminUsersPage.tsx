@@ -4,7 +4,7 @@ import { apiRequest } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 
-type ManagedUser = { id: string; email: string; fullName: string; role: 'STUDENT' | 'LECTURER' | 'ADMIN'; isActive: boolean; createdAt: string };
+type ManagedUser = { id: string; email: string; fullName: string; role: 'STUDENT' | 'LECTURER' | 'ADMIN'; isActive: boolean; isApproved: boolean; createdAt: string };
 const emptyForm = { email: '', fullName: '', password: '', role: 'STUDENT' as ManagedUser['role'], isActive: true };
 
 export const AdminUsersPage: React.FC = () => {
@@ -57,6 +57,12 @@ export const AdminUsersPage: React.FC = () => {
     if (result.success) await load();
   };
 
+  const approve = async (account: ManagedUser) => {
+    const result = await apiRequest(`/admin/users/${account.id}`, { method: 'PATCH', body: JSON.stringify({ isApproved: true, isActive: true }) });
+    setMessage(result.success ? 'Đã duyệt tài khoản.' : result.message || 'Không thể duyệt tài khoản.');
+    if (result.success) await load();
+  };
+
   return <div className="container" style={{ maxWidth: 1200 }}>
     <div style={{ marginBottom: '1rem' }}><Link to="/admin">← Quay lại Tổng quan</Link></div>
     <div style={{ marginBottom: '1.5rem' }}>
@@ -78,7 +84,7 @@ export const AdminUsersPage: React.FC = () => {
     </div>
     <div className="card">
       {loading ? <p>Đang tải…</p> : <div style={{ overflowX: 'auto' }}><table className="table"><thead><tr><th>Họ tên</th><th>Email</th><th>Vai trò</th><th>Trạng thái</th><th>Ngày tạo</th><th>Thao tác</th></tr></thead><tbody>
-        {users.map(account => <tr key={account.id}><td>{account.fullName}</td><td>{account.email}</td><td><span className="badge badge-blue">{account.role}</span></td><td><span className={`badge ${account.isActive ? 'badge-green' : 'badge-red'}`}>{account.isActive ? 'Hoạt động' : 'Đã vô hiệu hóa'}</span></td><td>{new Date(account.createdAt).toLocaleDateString('vi-VN')}</td><td style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}><button className="btn btn-secondary btn-sm" onClick={() => startEdit(account)}>Sửa</button>{account.isActive ? <button className="btn btn-ghost-danger btn-sm" disabled={account.id === currentUser?.id} onClick={() => setPendingDeactivate(account)}>Vô hiệu hóa</button> : <button className="btn btn-secondary btn-sm" onClick={() => activate(account)}>Kích hoạt</button>}</td></tr>)}
+        {users.map(account => <tr key={account.id}><td>{account.fullName}</td><td>{account.email}</td><td><span className="badge badge-blue">{account.role}</span></td><td><span className={`badge ${!account.isApproved ? 'badge-yellow' : account.isActive ? 'badge-green' : 'badge-red'}`}>{!account.isApproved ? 'Chờ duyệt' : account.isActive ? 'Hoạt động' : 'Đã vô hiệu hóa'}</span></td><td>{new Date(account.createdAt).toLocaleDateString('vi-VN')}</td><td style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>{!account.isApproved && <button className="btn btn-primary btn-sm" onClick={() => void approve(account)}>Duyệt</button>}<button className="btn btn-secondary btn-sm" onClick={() => startEdit(account)}>Sửa</button>{account.isApproved && (account.isActive ? <button className="btn btn-ghost-danger btn-sm" disabled={account.id === currentUser?.id} onClick={() => setPendingDeactivate(account)}>Vô hiệu hóa</button> : <button className="btn btn-secondary btn-sm" onClick={() => activate(account)}>Kích hoạt</button>)}</td></tr>)}
       </tbody></table></div>}
     </div>
     <ConfirmDialog open={!!pendingDeactivate} title="Vô hiệu hóa tài khoản?" description={pendingDeactivate ? `${pendingDeactivate.fullName} (${pendingDeactivate.email}) sẽ không thể đăng nhập; các phiên hiện tại bị thu hồi. Bài nộp và dữ liệu lớp học vẫn được giữ.` : ''} confirmLabel="Vô hiệu hóa" busy={deactivating} onConfirm={deactivate} onCancel={() => setPendingDeactivate(null)} />

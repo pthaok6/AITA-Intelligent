@@ -39,7 +39,13 @@ export class AppealService {
     });
 
     if (!submission) throw new HttpError(404, 'Không tìm thấy bài nộp.');
-    if (submission.studentId !== userId) {
+    const teamMembership = submission.teamId
+      ? await prisma.teamMember.findUnique({
+          where: { teamId_studentId: { teamId: submission.teamId, studentId: userId } },
+          select: { id: true },
+        })
+      : null;
+    if (submission.studentId !== userId && !teamMembership) {
       throw new HttpError(403, 'Bạn chỉ có thể khiếu nại bài nộp của chính mình.');
     }
 
@@ -146,6 +152,20 @@ export class AppealService {
   }
 
   async getSubmissionAppeals(submissionId: string, userId: string) {
+    const submission = await prisma.submission.findUnique({
+      where: { id: submissionId },
+      select: { studentId: true, teamId: true },
+    });
+    if (!submission) throw new HttpError(404, 'Submission not found.');
+    const teamMembership = submission.teamId
+      ? await prisma.teamMember.findUnique({
+          where: { teamId_studentId: { teamId: submission.teamId, studentId: userId } },
+          select: { id: true },
+        })
+      : null;
+    if (submission.studentId !== userId && !teamMembership) {
+      throw new HttpError(403, 'You are not a member of this submission team.');
+    }
     return prisma.appeal.findMany({
       where: {
         submissionId,

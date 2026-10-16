@@ -9,7 +9,7 @@ export const adminRouter = Router();
 adminRouter.use(authenticateJwt, requireRoles('ADMIN'));
 
 adminRouter.get('/users', asyncRoute(async (_req, res) => {
-  const users = await prisma.user.findMany({ orderBy: [{ createdAt: 'desc' }], select: { id: true, email: true, fullName: true, role: true, isActive: true, createdAt: true } });
+  const users = await prisma.user.findMany({ orderBy: [{ createdAt: 'desc' }], select: { id: true, email: true, fullName: true, role: true, isActive: true, isApproved: true, createdAt: true } });
   res.json({ success: true, data: users });
 }));
 
@@ -20,14 +20,14 @@ adminRouter.post('/users', asyncRoute(async (req, res) => {
   if (typeof password !== 'string' || password.length < 8 || Buffer.byteLength(password) > 72) throw new HttpError(400, 'Mật khẩu cần từ 8 ký tự và không quá 72 byte.');
   if (!['STUDENT', 'LECTURER', 'ADMIN'].includes(role)) throw new HttpError(400, 'Vai trò không hợp lệ.');
   try {
-    const user = await prisma.user.create({ data: { email, fullName: fullName.trim(), passwordHash: await bcrypt.hash(password, 12), role }, select: { id: true, email: true, fullName: true, role: true, isActive: true, createdAt: true } });
+    const user = await prisma.user.create({ data: { email, fullName: fullName.trim(), passwordHash: await bcrypt.hash(password, 12), role }, select: { id: true, email: true, fullName: true, role: true, isActive: true, isApproved: true, createdAt: true } });
     res.status(201).json({ success: true, data: user });
   } catch (error: any) { if (error.code === 'P2002') throw new HttpError(409, 'Email đã được sử dụng.'); throw error; }
 }));
 
 adminRouter.patch('/users/:id', asyncRoute(async (req: AuthRequest, res) => {
   const id = String(req.params.id);
-  const { email: emailInput, fullName, role, isActive, password } = req.body || {};
+  const { email: emailInput, fullName, role, isActive, isApproved, password } = req.body || {};
   const existing = await prisma.user.findUnique({ where: { id } });
   if (!existing) throw new HttpError(404, 'Không tìm thấy tài khoản.');
   const data: Record<string, unknown> = {};
@@ -44,6 +44,10 @@ adminRouter.patch('/users/:id', asyncRoute(async (req: AuthRequest, res) => {
     if (typeof isActive !== 'boolean') throw new HttpError(400, 'isActive phải là true hoặc false.');
     data.isActive = isActive;
   }
+  if (isApproved !== undefined) {
+    if (typeof isApproved !== 'boolean') throw new HttpError(400, 'isApproved phải là true hoặc false.');
+    data.isApproved = isApproved;
+  }
   if (password !== undefined) {
     if (typeof password !== 'string' || password.length < 8 || Buffer.byteLength(password) > 72) throw new HttpError(400, 'Mật khẩu cần từ 8 ký tự và không quá 72 byte.');
     data.passwordHash = await bcrypt.hash(password, 12);
@@ -55,7 +59,7 @@ adminRouter.patch('/users/:id', asyncRoute(async (req: AuthRequest, res) => {
     if (existing.isActive && activeAdmins <= 1) throw new HttpError(409, 'Phải giữ lại ít nhất một quản trị viên đang hoạt động.');
   }
   try {
-    const user = await prisma.user.update({ where: { id }, data: data as any, select: { id: true, email: true, fullName: true, role: true, isActive: true, createdAt: true } });
+    const user = await prisma.user.update({ where: { id }, data: data as any, select: { id: true, email: true, fullName: true, role: true, isActive: true, isApproved: true, createdAt: true } });
     res.json({ success: true, data: user });
   } catch (error: any) { if (error.code === 'P2002') throw new HttpError(409, 'Email đã được sử dụng.'); throw error; }
 }));

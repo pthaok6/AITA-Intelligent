@@ -190,6 +190,11 @@ export const MyTeamsPage: React.FC = () => {
                   ) : (
                     <span>Đã nộp · Điểm công bố sau {new Date(team.scoreReleaseAt).toLocaleString('vi-VN')}</span>
                   )}
+                  {scoreReady && latestSubmission?.id && (
+                    <Link className="btn btn-secondary btn-sm" to={`/student/submissions/${latestSubmission.id}`}>
+                      Xem điểm chi tiết và khiếu nại
+                    </Link>
+                  )}
                 </div>
 
                 <h4 style={{ margin: '1.25rem 0 0.5rem', color: 'var(--text-secondary)' }}>

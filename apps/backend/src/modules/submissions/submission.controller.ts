@@ -25,7 +25,15 @@ submissionRouter.post('/exams/:examId/submissions', authenticateJwt,
 
 async function authorizedSubmission(req: AuthRequest) {
   const submission = await submissionService.getSubmission(String(req.params.id));
-  if (submission.studentId !== req.user!.userId) await classAccess(submission.exam.classId, req.user!, true);
+  if (req.user!.role === 'STUDENT' && submission.studentId !== req.user!.userId && submission.teamId) {
+    const membership = await prisma.teamMember.findUnique({
+      where: { teamId_studentId: { teamId: submission.teamId, studentId: req.user!.userId } },
+      select: { id: true },
+    });
+    if (!membership) throw new HttpError(403, 'You are not a member of this submission team.');
+  } else if (submission.studentId !== req.user!.userId) {
+    await classAccess(submission.exam.classId, req.user!, true);
+  }
   else if (await submissionService.getLatestSubmissionId(submission.examId, req.user!.userId) !== submission.id) throw new HttpError(404, 'Không tìm thấy bài nộp hiện hành.');
   return submission;
 }
