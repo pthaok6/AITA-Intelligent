@@ -62,10 +62,15 @@ export class TeamRepository {
     return prisma.team.findMany({
       where: { members: { some: { studentId } } },
       include: {
-        exam: { select: { id: true, title: true, classId: true, class: { select: { classCode: true, name: true } } } },
+        exam: { select: { id: true, title: true, classId: true, endTime: true, class: { select: { classCode: true, name: true } } } },
         members: {
           include: { student: { select: { id: true, fullName: true, email: true } } },
           orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
+        },
+        submissions: {
+          orderBy: { attemptNumber: 'desc' },
+          take: 1,
+          select: { id: true, attemptNumber: true, status: true, totalScore: true, submittedAt: true },
         },
       },
       orderBy: { createdAt: 'desc' },

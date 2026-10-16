@@ -131,6 +131,10 @@ input, textarea, select {
 .team-analysis-card-header > div:first-child { min-width: 0; }
 .team-analysis-card-header > .btn { flex-shrink: 0; }
 .team-analysis-panel .table { font-size: 0.875rem; }
+.team-score-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 1rem; margin-top: 1rem; padding: 0.75rem 1rem; color: var(--text-secondary); background: var(--surface-inset); border-radius: var(--radius-control); }
+.team-score-summary > strong { color: var(--text-primary); }
+.team-score-value { color: #34d399; font-size: 1.05rem; font-weight: 700; }
+.team-score-status { color: var(--text-secondary); font-size: 0.8rem; font-weight: 500; }
 
 .lecturer-class-list {
   display: flex;
@@ -356,7 +360,7 @@ dialog.confirm-dialog::backdrop {
 
 @media (max-width: 520px) {
   .container { padding: 1rem; }
-  .card { padding: 1.1rem; }
+  .card { min-width: 0; padding: 1.1rem; }
   .table th, .table td { padding: 0.65rem 0.75rem; }
   .confirm-panel { padding: 1.2rem; }
   .confirm-actions { flex-direction: column-reverse; }
@@ -369,8 +373,48 @@ dialog.confirm-dialog::backdrop {
 }
 
 @media (max-width: 760px) {
+  .container { min-width: 0; }
+  .card { min-width: 0; }
   .lecturer-class-list { width: 100%; }
   .lecturer-class-card { padding-right: 1rem; padding-left: 1rem; }
+  .table { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .student-exam-grid,
+  .exam-take-layout { grid-template-columns: minmax(0, 1fr) !important; }
+  .student-class-header { align-items: flex-start !important; flex-direction: column; gap: 0.5rem; }
+  .student-join-form { align-items: stretch !important; flex-direction: column; }
+  .student-join-form .form-group,
+  .student-join-form .btn { width: 100%; }
+  .student-dashboard-actions { width: 100%; }
+  .student-dashboard-actions .btn { flex: 1 1 10rem; text-align: center; }
+  .page-submission-result .submission-result-toolbar { align-items: stretch !important; flex-direction: column; }
+  .page-submission-result .submission-result-links { align-items: stretch !important; flex-direction: column; gap: 0.65rem !important; }
+  .page-submission-result .submission-result-links .btn,
+  .page-submission-result .ai-review-button { width: 100%; text-align: center; }
+  .page-submission-result .submission-overview-header { align-items: flex-start !important; flex-direction: column; }
+  .page-submission-result .submission-overview-header h2 { overflow-wrap: anywhere; }
+  .page-submission-result .submission-result-status { width: 100%; justify-content: space-between; }
+  .page-submission-result .submission-hash { overflow-wrap: anywhere; word-break: break-all; }
+  .page-submission-result code { overflow-wrap: anywhere; }
+  .page-submission-result .appeal-score-grid { grid-template-columns: minmax(0, 1fr) !important; gap: 0 !important; }
+  .page-submission-result .appeal-form-actions { flex-direction: column-reverse; }
+  .page-submission-result .appeal-form-actions .btn { width: 100%; }
+  .page-submission-result .appeal-history-header { align-items: flex-start !important; flex-wrap: wrap; gap: 0.5rem; }
+  .page-submission-result .error-explainer-card > div:first-child { align-items: flex-start !important; flex-direction: column; }
+  .page-submission-result .error-explainer-card > div:first-child > div { align-items: flex-start !important; flex-wrap: wrap; }
+}
+
+@media (max-width: 520px) {
+  .page-submission-result .card { padding: 1rem; }
+  .page-submission-result .submission-result-status > span:last-child { font-size: 1.1rem !important; }
+  .page-submission-result .clean-code-card { padding: 1rem; }
+  .page-submission-result .clean-code-card > div:first-child { align-items: flex-start !important; }
+  .page-submission-result .clean-code-card h3 { font-size: 1rem !important; }
+  .page-submission-result .clean-score-circle { flex: 0 0 auto; }
+  .page-submission-result .form-modal-panel { padding: 1rem; }
+  .page-appeals .card { padding: 1rem; }
+  .team-score-summary { align-items: flex-start; flex-direction: column; }
+  .page-my-submissions .table th,
+  .page-my-submissions .table td { padding: 0.6rem; }
 }
 
 /* Forms */
@@ -416,6 +460,7 @@ dialog.confirm-dialog::backdrop {
 .badge-green { background: rgba(16, 185, 129, 0.2); color: #34d399; }
 .badge-yellow { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
 .badge-red { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+.notification-count { display: inline-grid; place-items: center; min-width: 1.25rem; height: 1.25rem; margin-left: 0.45rem; padding: 0 0.3rem; color: #fff; background: #dc2626; border-radius: 999px; font-size: 0.7rem; font-weight: 750; line-height: 1; }
 
 /* Table */
 .table {

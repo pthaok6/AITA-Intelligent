@@ -164,6 +164,8 @@ export const MyTeamsPage: React.FC = () => {
           {teams.map(team => {
             const leader = team.members?.find((member: any) => member.role === 'LEADER');
             const isLeader = leader?.studentId === user?.id;
+            const latestSubmission = team.latestSubmission;
+            const scoreReady = latestSubmission?.scoreReleased && ['COMPLETED', 'COMPILE_ERROR', 'FAILED'].includes(latestSubmission.status);
             return (
               <section key={team.id} className="card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
@@ -175,6 +177,19 @@ export const MyTeamsPage: React.FC = () => {
                     </p>
                   </div>
                   {team.repoUrl && <a className="btn btn-secondary btn-sm" href={team.repoUrl} target="_blank" rel="noreferrer">Mở repository</a>}
+                </div>
+
+                <div className="team-score-summary">
+                  <strong>Điểm nhóm</strong>
+                  {!latestSubmission ? (
+                    <span>Chưa có bài nộp</span>
+                  ) : scoreReady ? (
+                    <span className="team-score-value">{latestSubmission.totalScore} điểm <span className="team-score-status">· {latestSubmission.status}</span></span>
+                  ) : latestSubmission.scoreReleased ? (
+                    <span>Đang chấm bài nhóm…</span>
+                  ) : (
+                    <span>Đã nộp · Điểm công bố sau {new Date(team.scoreReleaseAt).toLocaleString('vi-VN')}</span>
+                  )}
                 </div>
 
                 <h4 style={{ margin: '1.25rem 0 0.5rem', color: 'var(--text-secondary)' }}>

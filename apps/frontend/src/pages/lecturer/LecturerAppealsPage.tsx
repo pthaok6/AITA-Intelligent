@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
+import { markAppealInboxAsSeen } from '../student/appealNotifications';
 
 const formatDate = (value: string) => {
   return new Date(value).toLocaleString('vi-VN', {
@@ -64,6 +65,10 @@ export const LecturerAppealsPage: React.FC = () => {
     const res = await apiRequest(url);
     if (res.success && res.data) {
       setAppeals(res.data);
+      if (user && (user.role === 'LECTURER' || user.role === 'ADMIN')) {
+        markAppealInboxAsSeen(res.data, user.id);
+        window.dispatchEvent(new Event('appeal-inbox-read'));
+      }
     } else {
       setError(res.message || 'Không thể tải danh sách khiếu nại.');
     }
@@ -76,7 +81,7 @@ export const LecturerAppealsPage: React.FC = () => {
 
   useEffect(() => {
     fetchAppeals();
-  }, [statusFilter, selectedClassId]);
+  }, [statusFilter, selectedClassId, user?.id, user?.role]);
 
   const handleOpenResolveModal = (appeal: any) => {
     setActiveAppeal(appeal);

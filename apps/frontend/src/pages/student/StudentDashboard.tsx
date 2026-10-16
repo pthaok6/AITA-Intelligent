@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { getUnreadAppealCount } from './appealNotifications';
 
 export const StudentDashboard: React.FC = () => {
   const [classes, setClasses] = useState<any[]>([]);
@@ -11,6 +12,7 @@ export const StudentDashboard: React.FC = () => {
   const [notice, setNotice] = useState('');
   const [pendingLeave, setPendingLeave] = useState<any>(null);
   const [leaving, setLeaving] = useState(false);
+  const [unreadAppealCount, setUnreadAppealCount] = useState(0);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -24,6 +26,23 @@ export const StudentDashboard: React.FC = () => {
     };
     fetchClasses();
   }, []);
+
+  useEffect(() => {
+    if (!user || user.role !== 'STUDENT') return;
+    let active = true;
+    const fetchAppealNotifications = async () => {
+      const res = await apiRequest('/appeals/my');
+      if (active && res.success && res.data) {
+        setUnreadAppealCount(getUnreadAppealCount(res.data, user.id));
+      }
+    };
+    void fetchAppealNotifications();
+    const timer = window.setInterval(() => void fetchAppealNotifications(), 30000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [user?.id, user?.role]);
 
   const joinClass = async (event: React.FormEvent) => {
     event.preventDefault(); setNotice('');
@@ -50,13 +69,16 @@ export const StudentDashboard: React.FC = () => {
           <h2>Cổng Luyện Tập & Nộp Bài Sinh Viên</h2>
           <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Chọn bài thi thực hành được giao để làm bài và nhận kết quả chấm tự động tức thì</p>
         </div>
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div className="student-dashboard-actions" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           {user?.role === 'STUDENT' && <Link to="/student/teams" className="btn btn-secondary">Nhóm của tôi</Link>}
-          <Link to="/student/appeals" className="btn btn-secondary">Đơn khiếu nại điểm của tôi</Link>
+          <Link to="/student/appeals" className="btn btn-secondary">
+            Đơn khiếu nại điểm của tôi
+            {unreadAppealCount > 0 && <span className="notification-count" aria-label={`${unreadAppealCount} khiếu nại có cập nhật mới`}>{unreadAppealCount > 99 ? '99+' : unreadAppealCount}</span>}
+          </Link>
         </div>
       </div>
 
-      {user?.role === 'STUDENT' && <form onSubmit={joinClass} className="card" style={{ display: 'flex', gap: '0.75rem', alignItems: 'end', marginBottom: '1.5rem' }}>
+      {user?.role === 'STUDENT' && <form onSubmit={joinClass} className="card student-join-form" style={{ display: 'flex', gap: '0.75rem', alignItems: 'end', marginBottom: '1.5rem' }}>
         <div className="form-group" style={{ flex: 1, marginBottom: 0 }}><label htmlFor="class-code">Tham gia lớp bằng mã lớp</label><input id="class-code" className="form-control" value={classCode} onChange={event => setClassCode(event.target.value)} required /></div>
         <button className="btn btn-primary" type="submit">Tham gia</button>
       </form>}
@@ -72,7 +94,7 @@ export const StudentDashboard: React.FC = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {classes.map((cls) => (
             <div key={cls.id} className="card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
+              <div className="student-class-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
                 <div>
                   <span className="badge badge-blue">{cls.classCode}</span>
                   <h3 style={{ marginTop: '0.25rem' }}>{cls.name}</h3>
@@ -87,7 +109,7 @@ export const StudentDashboard: React.FC = () => {
               {(!cls.exams || cls.exams.length === 0) ? (
                 <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: '0.5rem' }}>Chưa có bài thi nào mở.</p>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem', marginTop: '0.75rem' }}>
+                <div className="student-exam-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem', marginTop: '0.75rem' }}>
                   {cls.exams.map((exam: any) => (
                     <div key={exam.id} style={{ background: '#090d16', border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '1rem' }}>
                       <h4 style={{ marginBottom: '0.5rem' }}>{exam.title}</h4>

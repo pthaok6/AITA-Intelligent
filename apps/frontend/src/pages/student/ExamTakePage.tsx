@@ -90,7 +90,7 @@ export const ExamTakePage: React.FC = () => {
       <Link to="/student">← Danh sách bài tập</Link>
       {error && <p role="alert" style={{ color: '#f87171', marginTop: '0.5rem' }}>{error}</p>}
       {exam && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', marginTop: '1rem' }}>
+        <div className="exam-take-layout" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.5rem', marginTop: '1rem' }}>
           <div className="card">
             <span className="badge badge-blue">{exam.allowedLanguage === 'PYTHON' ? 'Python 3' : exam.allowedLanguage === 'JAVA' ? 'Java 17' : 'C# .NET 8'}</span>
             {exam.examType === 'GROUP' && <span className="badge badge-yellow" style={{ marginLeft: '0.5rem' }}>Bài tập nhóm</span>}

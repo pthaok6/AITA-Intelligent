@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
+import { useAuth } from '../../contexts/AuthContext';
+import { markAppealsAsSeen } from './appealNotifications';
 
 const formatDate = (value: string) => {
   return new Date(value).toLocaleString('vi-VN', {
@@ -28,6 +30,7 @@ const getStatusBadge = (status: string) => {
 };
 
 export const MyAppealsPage: React.FC = () => {
+  const { user } = useAuth();
   const [appeals, setAppeals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -38,6 +41,7 @@ export const MyAppealsPage: React.FC = () => {
     const res = await apiRequest('/appeals/my');
     if (res.success && res.data) {
       setAppeals(res.data);
+      if (user?.role === 'STUDENT') markAppealsAsSeen(res.data, user.id);
     } else {
       setError(res.message || 'Không thể tải danh sách khiếu nại.');
     }
@@ -46,7 +50,7 @@ export const MyAppealsPage: React.FC = () => {
 
   useEffect(() => {
     fetchAppeals();
-  }, []);
+  }, [user?.id, user?.role]);
 
   const filteredAppeals = appeals.filter((appeal) => {
     if (filterStatus === 'ALL') return true;

@@ -20,7 +20,7 @@ export const MySubmissionsPage: React.FC = () => {
     void load(); const timer = setInterval(load, 5000);
     return () => { active = false; clearInterval(timer); };
   }, [examId]);
-  return <div className="container">
+  return <div className="container page-my-submissions">
     <p><Link to="/student">← Quay lại lớp học</Link></p>
     <h2>Bài nộp mới nhất{exam ? `: ${exam.title}` : ''}</h2>
     {exam && items.some(item => !item.scoreReleased) && <p>Điểm và kết quả chấm sẽ được công bố sau khi hết hạn nộp.</p>}

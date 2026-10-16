@@ -213,9 +213,9 @@ export const SubmissionResultPage: React.FC = () => {
       : 'badge-red';
 
   return (
-    <div className="container" style={{ maxWidth: 1000 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+    <div className="container page-submission-result" style={{ maxWidth: 1000 }}>
+      <div className="submission-result-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div className="submission-result-links" style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <Link to={isStudent ? '/student' : '/lecturer'}>← Quay lại Dashboard</Link>
           {isStudent && (
             <Link to="/student/appeals" className="btn btn-secondary btn-sm">
@@ -226,7 +226,7 @@ export const SubmissionResultPage: React.FC = () => {
         {submission.scoreReleased && (
           <button
             type="button"
-            className="btn btn-secondary btn-sm"
+            className="btn btn-secondary btn-sm ai-review-button"
             disabled={triggeringAiReview}
             onClick={handleTriggerAiReview}
           >
@@ -243,14 +243,14 @@ export const SubmissionResultPage: React.FC = () => {
 
       {/* CARD 1: SUBMISSION OVERVIEW */}
       <div className="card" style={{ marginTop: '0.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
+        <div className="submission-overview-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div>
             <h2 style={{ margin: 0 }}>{submission.exam.title}</h2>
             <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: '0.25rem' }}>
               Lần nộp #{submission.attemptNumber || 1} • Ngôn ngữ: <strong>{submission.exam.allowedLanguage}</strong> · Nộp lúc: {formatDate(submission.submittedAt)}
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          <div className="submission-result-status" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <span
               className={
                 'badge ' +
@@ -287,7 +287,7 @@ export const SubmissionResultPage: React.FC = () => {
         <div style={{ marginTop: '1rem', fontSize: '0.875rem' }}>
           <strong>File nộp:</strong> {submission.originalFilename || 'Mã nguồn nộp'} · Entrypoint: <code>{submission.entrypoint || 'Mặc định'}</code>
           <div style={{ marginTop: '0.25rem', color: '#94a3b8' }}>
-            Mã băm SHA-256: <code style={{ fontSize: '0.8rem' }}>{submission.fileHashSha256}</code>
+            Mã băm SHA-256: <code className="submission-hash" style={{ fontSize: '0.8rem' }}>{submission.fileHashSha256}</code>
           </div>
           {submission.artifactType === 'ZIP' && (
             <div style={{ marginTop: '0.5rem' }}>
@@ -389,9 +389,8 @@ export const SubmissionResultPage: React.FC = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid rgba(59, 130, 246, 0.25)', paddingBottom: '1rem' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <span className="ai-badge">SEMANTIC CODE REVIEW</span>
                 <h3 style={{ margin: 0, color: '#93c5fd' }}>
-                  🤖 Đánh Giá Chất Lượng Clean Code & Kiến Trúc SOLID
+                Đánh Giá Chất Lượng Clean Code & Kiến Trúc SOLID
                 </h3>
               </div>
               <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: '#94a3b8' }}>
@@ -510,7 +509,7 @@ export const SubmissionResultPage: React.FC = () => {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 {appeals.map((app) => (
                   <div key={app.id} style={{ background: '#090d16', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="appeal-history-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <strong style={{ fontSize: '0.95rem' }}>{app.title}</strong>
                       {getStatusBadge(app.status)}
                     </div>
@@ -552,7 +551,7 @@ export const SubmissionResultPage: React.FC = () => {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="appeal-score-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
                   <label>Điểm hiện tại</label>
                   <input
@@ -589,7 +588,7 @@ export const SubmissionResultPage: React.FC = () => {
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
+              <div className="appeal-form-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.25rem' }}>
                 <button
                   type="button"
                   className="btn btn-secondary"

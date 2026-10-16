@@ -18,12 +18,13 @@ export default defineConfig({
       '/api': {
         target: 'http://127.0.0.1:5000',
         changeOrigin: true,
-        timeout: 3000,
+        timeout: 120000,
+        proxyTimeout: 120000,
         configure: (proxy) => {
-          proxy.on('error', (_err, _req, res) => {
+          proxy.on('error', (err, _req, res) => {
             if (res && !('headersSent' in res && res.headersSent) && 'writeHead' in res) {
               res.writeHead(503, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ success: false, message: 'Backend API chưa chạy trên cổng 5000.' }));
+              res.end(JSON.stringify({ success: false, message: `Không kết nối được Backend API: ${err.message}` }));
             }
           });
         },

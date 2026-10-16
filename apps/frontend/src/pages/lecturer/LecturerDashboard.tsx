@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useAuth } from '../../contexts/AuthContext';
+import { getUnreadAppealInboxCount } from '../student/appealNotifications';
 
 export const LecturerDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -19,6 +20,7 @@ export const LecturerDashboard: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [openClassMenu, setOpenClassMenu] = useState<string | null>(null);
+  const [unreadAppealCount, setUnreadAppealCount] = useState(0);
 
   const fetchClasses = async () => {
     setLoading(true);
@@ -32,6 +34,26 @@ export const LecturerDashboard: React.FC = () => {
   useEffect(() => {
     fetchClasses();
   }, []);
+
+  useEffect(() => {
+    if (!user || (user.role !== 'LECTURER' && user.role !== 'ADMIN')) return;
+    let active = true;
+    const fetchUnreadAppeals = async () => {
+      const res = await apiRequest('/appeals/lecturer?status=SUBMITTED');
+      if (active && res.success && res.data) {
+        setUnreadAppealCount(getUnreadAppealInboxCount(res.data, user.id));
+      }
+    };
+    void fetchUnreadAppeals();
+    const timer = window.setInterval(() => void fetchUnreadAppeals(), 30000);
+    const refreshAfterRead = () => void fetchUnreadAppeals();
+    window.addEventListener('appeal-inbox-read', refreshAfterRead);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener('appeal-inbox-read', refreshAfterRead);
+    };
+  }, [user?.id, user?.role]);
 
   useEffect(() => {
     if (!openClassMenu) return;
@@ -90,6 +112,7 @@ export const LecturerDashboard: React.FC = () => {
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
           <Link to={isAdmin ? '/admin/appeals' : '/lecturer/appeals'} className="btn btn-secondary">
              Khiếu nại
+            {unreadAppealCount > 0 && <span className="notification-count" aria-label={`${unreadAppealCount} new appeals`}>{unreadAppealCount > 99 ? '99+' : unreadAppealCount}</span>}
           </Link>
           {!isAdmin && <button onClick={() => { setClassCode(''); setName(''); setSemester('SU26'); setShowCreateModal(true); }} className="btn btn-primary">
             + Tạo lớp học mới
