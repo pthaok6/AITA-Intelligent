@@ -17,9 +17,12 @@ export const LoginPage: React.FC = () => {
     setError('');
     setLoading(true);
 
+    const cleanEmail = email.trim();
+    const cleanPassword = password.trim();
+
     const res = await apiRequest('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email: cleanEmail, password: cleanPassword }),
     });
 
     setLoading(false);

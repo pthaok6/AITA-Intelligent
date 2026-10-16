@@ -14,6 +14,9 @@ export interface MemberStats {
   contributionPercent: number;
   personalScore: number | null;
   isWarning: boolean;
+  isManualOverride?: boolean;
+  syncStatus?: string;
+  syncError?: string | null;
 }
 
 export class GitAnalyticsService {
@@ -48,7 +51,7 @@ export class GitAnalyticsService {
       if (c && c.login) {
         stats[c.login.toLowerCase()] = {
           commits: c.contributions || 1,
-          additions: (c.contributions || 1) * 25, // Fallback/estimated LOC ratio if stats API is queued
+          additions: (c.contributions || 1) * 25, // Estimated LOC ratio from contributions count
           deletions: (c.contributions || 1) * 5,
         };
       }
@@ -66,18 +69,26 @@ export class GitAnalyticsService {
     let gitStats: Record<string, { commits: number; additions: number; deletions: number }> = {};
     const parsed = team.repoUrl ? this.parseRepoOwnerAndName(team.repoUrl) : null;
     let gitFetchSuccess = false;
+    let syncError: string | null = null;
 
-    if (parsed) {
+    if (!team.repoUrl) {
+      syncError = 'Nhóm chưa đăng ký repository GitHub.';
+    } else if (!parsed) {
+      syncError = 'URL repository GitHub không hợp lệ.';
+    } else {
       try {
         gitStats = await this.fetchGitHubStats(parsed.owner, parsed.repo);
-        gitFetchSuccess = Object.keys(gitStats).length > 0;
+        gitFetchSuccess = true;
       } catch (error: any) {
-        console.warn(`[GitAnalytics] Không thể tải dữ liệu từ GitHub (${error.message}). Tạo số liệu mô phỏng dự phòng.`);
+        syncError = error.message;
+        console.warn(`[GitAnalytics] Không thể tải dữ liệu từ GitHub (${error.message}). Ghi nhận đồng bộ thất bại, không tạo số liệu giả.`);
       }
     }
 
+    const syncStatus = gitFetchSuccess ? 'SUCCESS' : 'FAILED';
+
     // Map stats to members
-    const memberRecords = members.map((m, index) => {
+    const memberRecords = members.map((m) => {
       const username = m.githubUsername?.trim().toLowerCase();
       let stats = { commits: 0, additions: 0, deletions: 0 };
 
@@ -89,12 +100,8 @@ export class GitAnalyticsService {
           stats = { commits: 0, additions: 0, deletions: 0 };
         }
       } else {
-        // Fallback simulated spread if offline or mock repo
-        stats = {
-          commits: Math.max(1, (index === 0 ? 12 : index === 1 ? 8 : index === 2 ? 5 : 1)),
-          additions: Math.max(10, (index === 0 ? 320 : index === 1 ? 180 : index === 2 ? 90 : 8)),
-          deletions: Math.max(2, (index === 0 ? 45 : index === 1 ? 25 : index === 2 ? 10 : 2)),
-        };
+        // Never fabricate mock stats when offline/error!
+        stats = { commits: 0, additions: 0, deletions: 0 };
       }
 
       const activityWeight = stats.additions + stats.deletions + stats.commits * 10;
@@ -113,6 +120,11 @@ export class GitAnalyticsService {
     const latestSubmission = team.submissions && team.submissions.length > 0 ? team.submissions[0] : null;
     const teamScore = latestSubmission && latestSubmission.status === 'COMPLETED' ? latestSubmission.totalScore : null;
 
+    const teamSize = members.length;
+    const expectedPercent = teamSize > 0 ? 100 / teamSize : 100;
+    const lowerBound = (team.exam as any)?.lowerBound ?? 0.5;
+    const upperBound = (team.exam as any)?.upperBound ?? 1.2;
+
     const contributionRecords = memberRecords.map(rec => {
       const contributionPercent = totalTeamActivity > 0
         ? Math.round((rec.activityWeight / totalTeamActivity) * 1000) / 10
@@ -120,19 +132,22 @@ export class GitAnalyticsService {
       return {
         ...rec,
         contributionPercent,
-        isWarning: contributionPercent < 5.0,
+        isWarning: totalTeamActivity > 0 && contributionPercent < 5.0,
       };
     });
-    const maxContributionPercent = Math.max(...contributionRecords.map(rec => rec.contributionPercent));
+
     const results: MemberStats[] = [];
 
     for (const rec of contributionRecords) {
-      // BR-12: highest contributor receives the team score; others are proportional to that member.
-      const personalScore = teamScore !== null && maxContributionPercent > 0
-        ? Math.round(teamScore * (rec.contributionPercent / maxContributionPercent) * 100) / 100
-        : null;
+      // BR-12: PersonalScore = TeamScore * clamp(ContributionPercent / (100 / TeamSize), LowerBound, UpperBound)
+      let personalScore: number | null = null;
+      if (gitFetchSuccess && teamScore !== null && totalTeamActivity > 0) {
+        const factor = expectedPercent > 0 ? rec.contributionPercent / expectedPercent : 1.0;
+        const clampedFactor = Math.min(Math.max(factor, lowerBound), upperBound);
+        personalScore = Math.round(teamScore * clampedFactor * 100) / 100;
+      }
 
-      await this.teamRepo.saveContribution({
+      const saved = await this.teamRepo.saveContribution({
         teamId,
         memberId: rec.member.id,
         commitsCount: rec.commits,
@@ -141,6 +156,8 @@ export class GitAnalyticsService {
         contributionPercent: rec.contributionPercent,
         personalScore,
         isWarning: rec.isWarning,
+        syncStatus,
+        syncError,
       });
 
       results.push({
@@ -154,8 +171,11 @@ export class GitAnalyticsService {
         locAdded: rec.additions,
         locDeleted: rec.deletions,
         contributionPercent: rec.contributionPercent,
-        personalScore,
+        personalScore: saved.personalScore,
         isWarning: rec.isWarning,
+        isManualOverride: saved.isManualOverride,
+        syncStatus,
+        syncError,
       });
     }
 

@@ -14,21 +14,37 @@ const http_1 = require("../../shared/http");
 const submission_archive_1 = require("../../infrastructure/storage/submission-archive");
 const prisma_1 = require("../../infrastructure/database/prisma");
 exports.submissionRouter = (0, express_1.Router)();
-const upload = (0, multer_1.default)({ storage: multer_1.default.memoryStorage(), limits: { fileSize: submission_archive_1.ZIP_LIMIT, files: 1, fields: 1, fieldSize: 512, parts: 2 },
+const upload = (0, multer_1.default)({ storage: multer_1.default.memoryStorage(), limits: { fileSize: submission_archive_1.ZIP_LIMIT, files: 1, fields: 2, fieldSize: 512, parts: 3 },
     fileFilter: (_req, file, done) => /\.zip$/i.test(file.originalname) ? done(null, true) : done(new http_1.HttpError(400, 'Chỉ nhận bài nộp .zip.')) });
 exports.submissionRouter.post('/exams/:examId/submissions', auth_middleware_1.authenticateJwt, (0, http_1.asyncRoute)(async (req, _res, next) => { await submission_service_1.submissionService.authorizeSubmission(String(req.params.examId), req.user.userId); next(); }), upload.single('file'), (0, http_1.asyncRoute)(async (req, res) => {
     if (!req.file)
         throw new http_1.HttpError(400, 'Gửi ZIP ở trường file, dùng multipart/form-data.');
-    const submission = await submission_service_1.submissionService.submitArchive(String(req.params.examId), req.user.userId, req.file.buffer, req.file.originalname, req.body.entrypoint);
+    const submission = await submission_service_1.submissionService.submitArchive(String(req.params.examId), req.user.userId, req.file.buffer, req.file.originalname, req.body.entrypoint, req.body.repoUrl);
     res.status(201).json({ success: true, data: {
             id: submission.id, examId: submission.examId, submittedAt: submission.submittedAt,
             status: submission.status, scoreReleased: false,
         } });
 }));
+exports.submissionRouter.post('/submissions/:id/approve-late', auth_middleware_1.authenticateJwt, (0, http_1.asyncRoute)(async (req, res) => {
+    if (req.user.role !== 'LECTURER' && req.user.role !== 'ADMIN') {
+        throw new http_1.HttpError(403, 'Chỉ giảng viên mới có quyền duyệt chấm bài nộp muộn.');
+    }
+    const submission = await submission_service_1.submissionService.approveLateSubmission(String(req.params.id), req.user.userId);
+    res.json({ success: true, data: submission });
+}));
 async function authorizedSubmission(req) {
     const submission = await submission_service_1.submissionService.getSubmission(String(req.params.id));
-    if (submission.studentId !== req.user.userId)
+    if (req.user.role === 'STUDENT' && submission.studentId !== req.user.userId && submission.teamId) {
+        const membership = await prisma_1.prisma.teamMember.findUnique({
+            where: { teamId_studentId: { teamId: submission.teamId, studentId: req.user.userId } },
+            select: { id: true },
+        });
+        if (!membership)
+            throw new http_1.HttpError(403, 'You are not a member of this submission team.');
+    }
+    else if (submission.studentId !== req.user.userId) {
         await (0, class_access_1.classAccess)(submission.exam.classId, req.user, true);
+    }
     else if (await submission_service_1.submissionService.getLatestSubmissionId(submission.examId, req.user.userId) !== submission.id)
         throw new http_1.HttpError(404, 'Không tìm thấy bài nộp hiện hành.');
     return submission;

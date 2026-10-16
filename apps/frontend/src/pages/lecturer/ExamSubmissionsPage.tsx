@@ -7,7 +7,7 @@ const formatDate = (value?: string) => {
   if (!value) return '-';
   try {
     const d = new Date(value);
-    return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    return isNaN(d.getTime()) ? '-' : d.toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   } catch {
     return '-';
   }
@@ -44,8 +44,26 @@ export const ExamSubmissionsPage: React.FC = () => {
   const [editingMemberScore, setEditingMemberScore] = useState<{ teamId: string; studentId: string; score: string } | null>(null);
   const [savingScore, setSavingScore] = useState(false);
   const [deletingTeamId, setDeletingTeamId] = useState<string | null>(null);
+  const [approvingLateId, setApprovingLateId] = useState<string | null>(null);
 
   const selectedExam = exams.find(exam => exam.id === selectedExamId);
+
+  const handleApproveLate = async (submissionId: string) => {
+    setApprovingLateId(submissionId);
+    setError('');
+    const res = await apiRequest(`/submissions/${submissionId}/approve-late`, { method: 'POST' });
+    setApprovingLateId(null);
+    if (res.success) {
+      const [subRes, teamRes] = await Promise.all([
+        apiRequest(`/exams/${selectedExamId}/submissions`),
+        apiRequest(`/exams/${selectedExamId}/teams`),
+      ]);
+      if (subRes.success && subRes.data) setSubmissions(subRes.data);
+      if (teamRes.success && teamRes.data) setTeams(teamRes.data);
+    } else {
+      setError(res.message || 'Không thể duyệt bài nộp muộn.');
+    }
+  };
 
   const handleSaveScore = async (teamId: string, studentId: string) => {
     if (!editingMemberScore) return;
@@ -420,18 +438,33 @@ export const ExamSubmissionsPage: React.FC = () => {
                                         </div>
                                       )}
                                     </td>
-                                    <td>{contrib ? `${contrib.commitsCount} commits / +${contrib.locAdded} -${contrib.locDeleted}` : '-'}</td>
+                                    <td>
+                                      {contrib ? (
+                                        contrib.syncStatus === 'FAILED' ? (
+                                          <span style={{ color: '#f87171', fontSize: '0.8rem' }} title={contrib.syncError || 'Lỗi đồng bộ'}>
+                                            ⚠️ Lỗi sync
+                                          </span>
+                                        ) : (
+                                          `${contrib.commitsCount} commits / +${contrib.locAdded} -${contrib.locDeleted}`
+                                        )
+                                      ) : '-'}
+                                    </td>
                                     <td>
                                       {contrib ? (
                                         <div>
                                           <strong>{contrib.contributionPercent}%</strong>
                                           <div style={{ background: '#334155', height: '6px', borderRadius: '3px', marginTop: '4px', width: '100px' }}>
-                                            <div style={{ background: '#3b82f6', height: '100%', width: `${Math.min(100, contrib.contributionPercent)}%`, borderRadius: '3px' }} />
+                                            <div style={{ background: contrib.isWarning ? '#ef4444' : '#3b82f6', height: '100%', width: `${Math.min(100, contrib.contributionPercent)}%`, borderRadius: '3px' }} />
                                           </div>
+                                          {contrib.isWarning && (
+                                            <span className="badge badge-red" style={{ fontSize: '0.68rem', display: 'inline-block', marginTop: '3px' }} title="Đóng góp dưới 5% tổng hoạt động nhóm">
+                                              ⚠️ &lt; 5% (BR-05)
+                                            </span>
+                                          )}
                                         </div>
                                       ) : '-'}
                                     </td>
-                                    <td style={{ minWidth: '130px' }}>
+                                    <td style={{ minWidth: '140px' }}>
                                       {editingMemberScore?.studentId === m.studentId ? (
                                         <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
                                           <input
@@ -449,10 +482,15 @@ export const ExamSubmissionsPage: React.FC = () => {
                                           <button className="btn btn-secondary btn-sm" onClick={() => setEditingMemberScore(null)}>Hủy</button>
                                         </div>
                                       ) : (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                                           <span style={{ fontWeight: 'bold', fontSize: '0.95rem', color: (contrib && contrib.personalScore != null) ? '#34d399' : '#94a3b8' }}>
                                             {(contrib && contrib.personalScore != null) ? `${contrib.personalScore} pts` : latestSub?.status === 'COMPLETED' ? 'Chưa tính' : '-'}
                                           </span>
+                                          {contrib?.isManualOverride && (
+                                            <span className="badge badge-yellow" style={{ fontSize: '0.65rem' }} title="Điểm đã được GV chỉnh tay">
+                                              GV sửa
+                                            </span>
+                                          )}
                                           <button
                                             className="btn btn-secondary btn-sm"
                                             title="Chấm điểm thủ công / Ghi đè điểm cho SV này"
@@ -483,7 +521,7 @@ export const ExamSubmissionsPage: React.FC = () => {
                                 >
                                   <option value="">-- Chọn sinh viên --</option>
                                   {classStudents
-                                    .filter(s => !team.members?.some((m: any) => m.studentId === s.id))
+                                    .filter(s => !teams.some(t => t.members?.some((m: any) => m.studentId === s.id)))
                                     .map(s => (
                                       <option key={s.id} value={s.id}>
                                         {s.fullName} ({s.email})
@@ -584,8 +622,8 @@ export const ExamSubmissionsPage: React.FC = () => {
                       </td>
                       <td>{formatDate(sub.submittedAt)}</td>
                       <td>
-                        <span className={`badge ${sub.status === 'COMPLETED' ? 'badge-green' : sub.status === 'COMPILE_ERROR' ? 'badge-red' : sub.status === 'RUNNING' ? 'badge-yellow' : 'badge-blue'}`}>
-                          {sub.status}
+                        <span className={`badge ${sub.status === 'COMPLETED' ? 'badge-green' : sub.status === 'COMPILE_ERROR' ? 'badge-red' : sub.status === 'RUNNING' ? 'badge-yellow' : sub.status === 'LATE' ? 'badge-yellow' : 'badge-blue'}`}>
+                          {sub.status === 'LATE' ? 'NỘP MUỘN (Chờ duyệt)' : sub.status}
                         </span>
                       </td>
                       <td style={{ fontWeight: 600, fontSize: '1.05rem', color: '#34d399' }}>
@@ -602,9 +640,20 @@ export const ExamSubmissionsPage: React.FC = () => {
                       </td>
                       <td>{sub.astStatus}</td>
                       <td>
-                        <Link to={`/student/submissions/${sub.id}`} className="btn btn-secondary btn-sm">
-                          Xem chi tiết
-                        </Link>
+                        <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <Link to={`/student/submissions/${sub.id}`} className="btn btn-secondary btn-sm">
+                            Xem chi tiết
+                          </Link>
+                          {sub.status === 'LATE' && (
+                            <button
+                              className="btn btn-primary btn-sm"
+                              disabled={approvingLateId === sub.id}
+                              onClick={() => handleApproveLate(sub.id)}
+                            >
+                              {approvingLateId === sub.id ? 'Đang duyệt...' : 'Duyệt bài muộn'}
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

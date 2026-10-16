@@ -20,7 +20,7 @@ exports.examRouter.get('/class/:classId', auth_middleware_1.authenticateJwt, asy
     }
 });
 // Giảng viên tạo đề thi
-exports.examRouter.post('/', auth_middleware_1.authenticateJwt, (0, auth_middleware_1.requireRoles)(enums_1.UserRole.LECTURER, enums_1.UserRole.ADMIN), async (req, res) => {
+exports.examRouter.post('/', auth_middleware_1.authenticateJwt, (0, auth_middleware_1.requireRoles)(enums_1.UserRole.LECTURER), async (req, res) => {
     try {
         const { classId, title, descriptionMd, allowedLanguage, examType, timeLimitMs, memoryLimitMb, startTime, endTime, testCases } = req.body;
         if (!classId || !title || !descriptionMd || !startTime || !endTime) {

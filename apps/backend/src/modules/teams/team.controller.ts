@@ -136,18 +136,19 @@ teamRouter.put('/teams/:teamId/leader', authenticateJwt, requireRoles('LECTURER'
 teamRouter.put('/teams/:teamId/repo', authenticateJwt, async (req: AuthRequest, res: Response, next) => {
   try {
     const teamId = req.params.teamId as string;
-    const { repoUrl } = req.body;
+    const { repoUrl, reason } = req.body;
     if (!repoUrl) throw new HttpError(400, 'repoUrl không được để trống.');
     const isLecturer = req.user!.role === 'LECTURER' || req.user!.role === 'ADMIN';
+    const team = await teamRepository.findTeamById(teamId);
+    if (!team) throw new HttpError(404, 'Không tìm thấy nhóm.');
     if (!isLecturer) {
-      const team = await teamRepository.findTeamById(teamId);
-      if (!team) throw new HttpError(404, 'Không tìm thấy nhóm.');
-      if (!team.members.some(member => member.studentId === req.user!.userId)) {
-        throw new HttpError(403, 'Bạn không thuộc nhóm này nên không thể cập nhật repository.');
+      const isLeader = team.members.some(member => member.studentId === req.user!.userId && member.role === 'LEADER');
+      if (!isLeader) {
+        throw new HttpError(403, 'Chỉ Trưởng nhóm (Team Leader) hoặc giảng viên mới có quyền cập nhật repository.');
       }
     }
-    const team = await teamService.updateRepoUrl(teamId, repoUrl);
-    res.status(200).json({ success: true, data: team });
+    const updated = await teamService.updateRepoUrl(teamId, repoUrl, req.user!.userId, reason);
+    res.status(200).json({ success: true, data: updated });
   } catch (error) { next(error); }
 });
 
@@ -176,8 +177,8 @@ teamRouter.put('/teams/:teamId/members/:studentId/score', authenticateJwt, requi
   try {
     const teamId = req.params.teamId as string;
     const studentId = req.params.studentId as string;
-    const { score } = req.body;
-    const updated = await teamService.updateMemberScore(teamId, studentId, Number(score));
+    const { score, reason } = req.body;
+    const updated = await teamService.updateMemberScore(teamId, studentId, Number(score), req.user!.userId, reason);
     res.status(200).json({ success: true, data: updated });
   } catch (error) { next(error); }
 });
@@ -198,6 +199,13 @@ teamRouter.put('/teams/:teamId/my-github', authenticateJwt, async (req: AuthRequ
 teamRouter.post('/teams/:teamId/sync-git', authenticateJwt, async (req: AuthRequest, res: Response, next) => {
   try {
     const teamId = req.params.teamId as string;
+    const isLecturer = req.user!.role === 'LECTURER' || req.user!.role === 'ADMIN';
+    if (!isLecturer) {
+      const team = await teamRepository.findTeamById(teamId);
+      if (!team || !team.members.some(m => m.studentId === req.user!.userId)) {
+        throw new HttpError(403, 'Bạn không thuộc nhóm này.');
+      }
+    }
     const contributions = await teamService.syncGitAnalytics(teamId);
     res.status(200).json({ success: true, data: contributions });
   } catch (error) { next(error); }
@@ -207,6 +215,13 @@ teamRouter.post('/teams/:teamId/sync-git', authenticateJwt, async (req: AuthRequ
 teamRouter.get('/teams/:teamId/contributions', authenticateJwt, async (req: AuthRequest, res: Response, next) => {
   try {
     const teamId = req.params.teamId as string;
+    const isLecturer = req.user!.role === 'LECTURER' || req.user!.role === 'ADMIN';
+    if (!isLecturer) {
+      const team = await teamRepository.findTeamById(teamId);
+      if (!team || !team.members.some(m => m.studentId === req.user!.userId)) {
+        throw new HttpError(403, 'Bạn không thuộc nhóm này.');
+      }
+    }
     const contributions = await teamService.getTeamContributions(teamId);
     res.status(200).json({ success: true, data: contributions });
   } catch (error) { next(error); }

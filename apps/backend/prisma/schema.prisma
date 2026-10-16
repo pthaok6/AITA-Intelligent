@@ -26,6 +26,7 @@ model User {
   teamMemberships TeamMember[]
   studentAppeals  Appeal[]       @relation("StudentAppeals")
   resolvedAppeals Appeal[]       @relation("ResolvedAppeals")
+  auditLogs       AuditLog[]
 
   @@map("users")
 }
@@ -83,6 +84,8 @@ model Exam {
   memoryLimitMb   Int            @default(512)
   startTime       DateTime
   endTime         DateTime
+  lowerBound      Float          @default(0.5)
+  upperBound      Float          @default(1.2)
   createdAt       DateTime       @default(now())
 
   class           Class          @relation(fields: [classId], references: [id], onDelete: Cascade)
@@ -129,7 +132,8 @@ model Submission {
   astVersion     String?
   astK           Int?
   astW           Int?
-  status         String          @default("QUEUED") // QUEUED, RUNNING, COMPLETED, COMPILE_ERROR, FAILED
+  status         String          @default("QUEUED") // QUEUED, RUNNING, COMPLETED, COMPILE_ERROR, FAILED, LATE
+  isLate         Boolean         @default(false)
   totalScore     Float           @default(0.0)
   compileMessage String?
   submittedAt    DateTime        @default(now())
@@ -287,6 +291,9 @@ model GitContribution {
   contributionPercent Float        @default(0.0) // 0.0 - 100.0%
   personalScore       Float?       // Derived per BR-12: TeamScore * ContributionFactor
   isWarning           Boolean      @default(false) // BR-05: true if contributionPercent < 5.0%
+  isManualOverride    Boolean      @default(false)
+  syncStatus          String       @default("SUCCESS") // SUCCESS, FAILED, PENDING
+  syncError           String?
   syncedAt            DateTime     @default(now())
 
   team                Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
@@ -325,3 +332,22 @@ model Appeal {
   @@index([status])
   @@map("appeals")
 }
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  action     String   // CHANGE_LEADER, UPDATE_REPO, OVERRIDE_SCORE, LATE_APPROVAL
+  entityType String   // TEAM, SUBMISSION, EXAM
+  entityId   String
+  actorId    String
+  oldValue   String?  @db.Text
+  newValue   String?  @db.Text
+  reason     String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  actor      User     @relation(fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@map("audit_logs")
+}
+

@@ -23,6 +23,14 @@ submissionRouter.post('/exams/:examId/submissions', authenticateJwt,
     } });
   }));
 
+submissionRouter.post('/submissions/:id/approve-late', authenticateJwt, asyncRoute(async (req: AuthRequest, res) => {
+  if (req.user!.role !== 'LECTURER' && req.user!.role !== 'ADMIN') {
+    throw new HttpError(403, 'Chỉ giảng viên mới có quyền duyệt chấm bài nộp muộn.');
+  }
+  const submission = await submissionService.approveLateSubmission(String(req.params.id), req.user!.userId);
+  res.json({ success: true, data: submission });
+}));
+
 async function authorizedSubmission(req: AuthRequest) {
   const submission = await submissionService.getSubmission(String(req.params.id));
   if (req.user!.role === 'STUDENT' && submission.studentId !== req.user!.userId && submission.teamId) {

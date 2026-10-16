@@ -117,16 +117,26 @@ export const ExamTakePage: React.FC = () => {
           ) : exam.examType === 'GROUP' && !myTeam ? (
             <div className="card">
               <h3 style={{ marginTop: 0 }}>Bạn chưa được xếp vào nhóm</h3>
-              <p style={{ color: 'var(--text-secondary)' }}>Liên hệ giảng viên để được thêm vào nhóm trước khi nộp bài.</p>
+              <p style={{ color: 'var(--text-secondary)' }}>Bài thi này là bài thi nhóm. Bạn cần tham gia một nhóm tại trang <Link to="/student/teams">Nhóm của tôi</Link> trước khi nộp bài.</p>
             </div>
           ) : exam.examType === 'GROUP' && !isLeader ? (
             <div className="card">
               <h3 style={{ marginTop: 0 }}>Bạn là thành viên nhóm {myTeam.name}</h3>
-              <p style={{ color: 'var(--text-secondary)' }}>Trưởng nhóm sẽ đính kèm link GitHub và nộp bài đại diện cho cả nhóm. Quản lý thành viên và GitHub username tại <Link to="/student/teams">Nhóm của tôi</Link>.</p>
+              <p style={{ color: 'var(--text-secondary)' }}>
+                Chỉ Trưởng nhóm ({teamLeader?.student?.fullName || 'Trưởng nhóm'}) mới có quyền nộp bài đại diện cho cả nhóm (BR-11).
+                Quản lý thành viên và GitHub username tại <Link to="/student/teams">Nhóm của tôi</Link>.
+              </p>
             </div>
           ) : (
             <form className="card" onSubmit={submit}>
-              {exam.examType === 'GROUP' && isLeader }
+              {exam.examType === 'GROUP' && isLeader && (
+                <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(14, 165, 233, 0.15)', border: '1px solid #0284c7', borderRadius: 'var(--radius-control)' }}>
+                  <strong style={{ color: '#38bdf8' }}>👑 Bạn là Trưởng nhóm ({myTeam.name}).</strong>
+                  <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    Bạn có quyền nộp bài cho cả nhóm. Repository đăng ký chính thức: <code>{myTeam.repoUrl || 'Chưa đăng ký'}</code>
+                  </p>
+                </div>
+              )}
               <h3>Nộp bài dạng ZIP</h3>
               <p>ZIP tối đa 25 MiB, giải nén tối đa 50 MiB. Chỉ mã nguồn được đưa vào môi trường chạy.</p>
               <p>
@@ -166,7 +176,9 @@ export const ExamTakePage: React.FC = () => {
                     placeholder="https://github.com/nhom/bai-tap"
                     required
                   />
-                  <small style={{ color: 'var(--text-secondary)' }}>Link được lưu cùng lần nộp và dùng để phân tích đóng góp Git.</small>
+                  <small style={{ color: 'var(--text-secondary)' }}>
+                    Link repository chính thức đã đăng ký của nhóm dùng để phân tích đóng góp Git.
+                  </small>
                 </div>
               )}
               <button className="btn btn-primary" type="submit" disabled={submitting} style={{ marginTop: '0.5rem' }}>

@@ -49,7 +49,7 @@ echo [4/4] Dang khoi dong API, worker va frontend...
 echo Frontend: http://localhost:5173
 echo API:      http://localhost:5000/api/health
 echo Prisma:   http://localhost:5555
-echo Nhan Ctrl+C de dung API, worker va frontend. Dong cua so Prisma Studio de dung Studio.
+echo Nhan Ctrl+C de dung, hoac chay file stop-all.bat de tat toan bo nhanh chong.
 call npm.cmd start
 set "EXIT_CODE=%ERRORLEVEL%"
 exit /b %EXIT_CODE%

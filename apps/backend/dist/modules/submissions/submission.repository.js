@@ -6,16 +6,27 @@ const enums_1 = require("../../domain/enums");
 const client_1 = require("@prisma/client");
 class SubmissionRepository {
     async create(data) {
-        const { sourceFiles, ...submissionData } = data;
+        const { sourceFiles, teamRepoUrl, ...submissionData } = data;
         for (let retry = 0;; retry++) {
             try {
                 return await prisma_1.prisma.$transaction(async (tx) => {
-                    const latest = await tx.submission.findFirst({ where: { examId: data.examId, studentId: data.studentId }, orderBy: { attemptNumber: 'desc' }, select: { attemptNumber: true } });
+                    const latest = data.teamId
+                        ? await tx.submission.findFirst({
+                            where: { examId: data.examId, teamId: data.teamId },
+                            orderBy: { attemptNumber: 'desc' },
+                            select: { attemptNumber: true },
+                        })
+                        : await tx.submission.findFirst({
+                            where: { examId: data.examId, studentId: data.studentId },
+                            orderBy: { attemptNumber: 'desc' },
+                            select: { attemptNumber: true },
+                        });
                     return tx.submission.create({
                         data: {
                             ...submissionData,
                             attemptNumber: (latest?.attemptNumber ?? 0) + 1,
-                            status: enums_1.SubmissionStatus.QUEUED,
+                            status: submissionData.status || enums_1.SubmissionStatus.QUEUED,
+                            isLate: submissionData.isLate || false,
                             ...(sourceFiles ? { sourceFiles: { create: sourceFiles } } : {}),
                         },
                     });
@@ -26,6 +37,25 @@ class SubmissionRepository {
                     throw error;
             }
         }
+    }
+    async findByFileHash(examId, fileHashSha256, teamId, studentId) {
+        const whereClause = { examId, fileHashSha256 };
+        if (teamId) {
+            whereClause.teamId = teamId;
+        }
+        else if (studentId) {
+            whereClause.studentId = studentId;
+        }
+        return prisma_1.prisma.submission.findFirst({
+            where: whereClause,
+            select: { id: true, attemptNumber: true, status: true, submittedAt: true },
+        });
+    }
+    async findLatestForTeam(examId, teamId) {
+        return prisma_1.prisma.submission.findFirst({
+            where: { examId, teamId },
+            orderBy: { submittedAt: 'desc' },
+        });
     }
     async findById(id) {
         return prisma_1.prisma.submission.findUnique({

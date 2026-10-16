@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.authService = exports.AuthService = exports.publicUser = exports.hashToken = exports.REFRESH_SECONDS = exports.ACCESS_SECONDS = void 0;
 exports.institutionalEmail = institutionalEmail;
+exports.isFptEducationEmail = isFptEducationEmail;
 exports.validateGoogleIdentity = validateGoogleIdentity;
 exports.authorizeGoogleLink = authorizeGoogleLink;
 const bcryptjs_1 = __importDefault(require("bcryptjs"));
@@ -31,14 +32,16 @@ function institutionalEmail(value) {
         throw new http_1.HttpError(403, 'Email này chưa thuộc danh sách miền được cho phép.');
     return email;
 }
+function isFptEducationEmail(email) {
+    const domain = email.slice(email.lastIndexOf('@') + 1).toLowerCase();
+    return ['fpt.edu.vn', 'fe.edu.vn'].some(root => domain === root || domain.endsWith(`.${root}`));
+}
 function validateGoogleIdentity(payload, nonce) {
     if (!payload?.sub || payload.email_verified !== true || !payload.email)
         throw new http_1.HttpError(401, 'Tài khoản Google chưa được xác minh.');
-    const email = institutionalEmail(payload.email);
-    // Google is authoritative for verified Gmail accounts without a Workspace hd claim.
-    if (email.split('@')[1] !== 'gmail.com' && (!payload.hd || !(0, config_1.allowedDomains)().includes(payload.hd.toLowerCase()))) {
-        throw new http_1.HttpError(403, 'Tài khoản ngoài Gmail phải thuộc tổ chức Google được cho phép.');
-    }
+    const email = payload.email.trim().toLowerCase();
+    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+        throw new http_1.HttpError(400, 'Email Google không hợp lệ.');
     if (!nonce || payload.nonce !== nonce)
         throw new http_1.HttpError(401, 'Phiên đăng nhập Google không hợp lệ. Vui lòng thử lại.');
     return { email, subject: payload.sub, name: payload.name || payload.email, picture: payload.picture };
@@ -70,8 +73,12 @@ class AuthService {
         if (typeof password !== 'string' || Buffer.byteLength(password) > 72)
             throw new http_1.HttpError(401, 'Email hoặc mật khẩu không chính xác.');
         const user = await this.db.user.findUnique({ where: { email } });
-        if (!user?.passwordHash || !user.isActive || !(await bcryptjs_1.default.compare(password, user.passwordHash)))
+        if (!user?.passwordHash || !(await bcryptjs_1.default.compare(password, user.passwordHash)))
             throw new http_1.HttpError(401, 'Email hoặc mật khẩu không chính xác.');
+        if (!user.isApproved)
+            throw new http_1.HttpError(403, 'Tài khoản đang chờ quản trị viên duyệt.');
+        if (!user.isActive)
+            throw new http_1.HttpError(403, 'Tài khoản đã bị vô hiệu hóa.');
         return this.createSession(user);
     }
     async googleLogin(credential, nonce, password) {
@@ -88,7 +95,7 @@ class AuthService {
             throw new http_1.HttpError(401, 'Thông tin đăng nhập Google không hợp lệ hoặc đã hết hạn.');
         }
         const identity = validateGoogleIdentity(payload, nonce);
-        // Link only verified Gmail/Workspace identities. Conditional update prevents a concurrent relink.
+        // Link only verified Google identities. Conditional update prevents a concurrent relink.
         const user = await this.db.$transaction(async (tx) => {
             const known = await tx.user.findUnique({ where: { googleSubject: identity.subject } });
             if (known)
@@ -106,8 +113,19 @@ class AuthService {
                     throw new http_1.HttpError(409, 'Email đã liên kết với tài khoản Google khác.');
                 return tx.user.findUniqueOrThrow({ where: { id: existing.id } });
             }
-            return tx.user.create({ data: { email: identity.email, fullName: identity.name, avatarUrl: identity.picture, googleSubject: identity.subject, role: 'STUDENT' } });
+            const isApproved = isFptEducationEmail(identity.email);
+            return tx.user.create({ data: {
+                    email: identity.email,
+                    fullName: identity.name,
+                    avatarUrl: identity.picture,
+                    googleSubject: identity.subject,
+                    role: 'STUDENT',
+                    isApproved,
+                    isActive: isApproved,
+                } });
         });
+        if (!user.isApproved)
+            throw new http_1.HttpError(403, 'Tài khoản đã được tạo và đang chờ quản trị viên duyệt.');
         if (!user.isActive)
             throw new http_1.HttpError(403, 'Tài khoản đã bị vô hiệu hóa.');
         return this.createSession(user);
@@ -130,7 +148,7 @@ class AuthService {
         const replacement = (0, node_crypto_1.randomBytes)(48).toString('base64url');
         return this.db.$transaction(async (tx) => {
             const session = await tx.authSession.findUnique({ where: { refreshTokenHash: tokenHash }, include: { user: true } });
-            if (!session || session.revokedAt || session.expiresAt <= new Date() || !session.user.isActive)
+            if (!session || session.revokedAt || session.expiresAt <= new Date() || !session.user.isActive || !session.user.isApproved)
                 throw new http_1.HttpError(401, 'Phiên đăng nhập đã hết hạn.');
             const rotated = await tx.authSession.updateMany({ where: { id: session.id, refreshTokenHash: tokenHash, revokedAt: null, expiresAt: { gt: new Date() } }, data: { refreshTokenHash: (0, exports.hashToken)(replacement) } });
             if (rotated.count !== 1)
@@ -150,7 +168,7 @@ class AuthService {
             throw new http_1.HttpError(401, 'Token không hợp lệ hoặc đã hết hạn.');
         }
         const session = await this.db.authSession.findUnique({ where: { id: decoded.sid }, include: { user: true } });
-        if (!session || session.userId !== decoded.userId || session.revokedAt || session.expiresAt <= new Date() || !session.user.isActive || session.user.role !== decoded.role)
+        if (!session || session.userId !== decoded.userId || session.revokedAt || session.expiresAt <= new Date() || !session.user.isActive || !session.user.isApproved || session.user.role !== decoded.role)
             throw new http_1.HttpError(401, 'Phiên đăng nhập không còn hiệu lực.');
         return { userId: session.user.id, email: session.user.email, role: session.user.role, sessionId: session.id };
     }

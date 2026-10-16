@@ -14,6 +14,7 @@ var SubmissionStatus;
     SubmissionStatus["COMPLETED"] = "COMPLETED";
     SubmissionStatus["COMPILE_ERROR"] = "COMPILE_ERROR";
     SubmissionStatus["FAILED"] = "FAILED";
+    SubmissionStatus["LATE"] = "LATE";
 })(SubmissionStatus || (exports.SubmissionStatus = SubmissionStatus = {}));
 var TestCaseStatus;
 (function (TestCaseStatus) {

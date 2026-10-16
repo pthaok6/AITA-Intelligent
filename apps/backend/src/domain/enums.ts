@@ -10,6 +10,7 @@ export enum SubmissionStatus {
   COMPLETED = 'COMPLETED',
   COMPILE_ERROR = 'COMPILE_ERROR',
   FAILED = 'FAILED',
+  LATE = 'LATE',
 }
 
 export enum TestCaseStatus {

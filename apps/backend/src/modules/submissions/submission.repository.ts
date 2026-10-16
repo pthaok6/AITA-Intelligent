@@ -15,20 +15,31 @@ export class SubmissionRepository {
     entrypoint?: string;
     sourceFiles?: Array<{ path: string; size: number }>;
     teamRepoUrl?: string;
+    status?: string;
+    isLate?: boolean;
   }) {
     const { sourceFiles, teamRepoUrl, ...submissionData } = data;
     for (let retry = 0; ; retry++) {
       try {
         return await prisma.$transaction(async tx => {
-          const latest = await tx.submission.findFirst({ where: { examId: data.examId, studentId: data.studentId }, orderBy: { attemptNumber: 'desc' }, select: { attemptNumber: true } });
-          if (teamRepoUrl && data.teamId) {
-            await tx.team.update({ where: { id: data.teamId }, data: { repoUrl: teamRepoUrl } });
-          }
+          const latest = data.teamId
+            ? await tx.submission.findFirst({
+                where: { examId: data.examId, teamId: data.teamId },
+                orderBy: { attemptNumber: 'desc' },
+                select: { attemptNumber: true },
+              })
+            : await tx.submission.findFirst({
+                where: { examId: data.examId, studentId: data.studentId },
+                orderBy: { attemptNumber: 'desc' },
+                select: { attemptNumber: true },
+              });
+
           return tx.submission.create({
             data: {
               ...submissionData,
               attemptNumber: (latest?.attemptNumber ?? 0) + 1,
-              status: SubmissionStatus.QUEUED,
+              status: (submissionData as any).status || SubmissionStatus.QUEUED,
+              isLate: (submissionData as any).isLate || false,
               ...(sourceFiles ? { sourceFiles: { create: sourceFiles } } : {}),
             },
           });
@@ -37,6 +48,26 @@ export class SubmissionRepository {
         if (retry >= 2 || !['P2002', 'P2034'].includes(error?.code)) throw error;
       }
     }
+  }
+
+  async findByFileHash(examId: string, fileHashSha256: string, teamId?: string, studentId?: string) {
+    const whereClause: any = { examId, fileHashSha256 };
+    if (teamId) {
+      whereClause.teamId = teamId;
+    } else if (studentId) {
+      whereClause.studentId = studentId;
+    }
+    return prisma.submission.findFirst({
+      where: whereClause,
+      select: { id: true, attemptNumber: true, status: true, submittedAt: true },
+    });
+  }
+
+  async findLatestForTeam(examId: string, teamId: string) {
+    return prisma.submission.findFirst({
+      where: { examId, teamId },
+      orderBy: { submittedAt: 'desc' },
+    });
   }
 
   async findById(id: string) {

@@ -28,22 +28,20 @@ async function main() {
     // Refuse collisions with accounts/classes that are not these test fixtures.
     for (const account of accounts) {
       const existing = await tx.user.findUnique({ where: { email: account.email } });
-      assert(!existing || (existing.role === account.role && existing.fullName === account.fullName),
-        `Email đã được sử dụng bởi tài khoản khác: ${account.email}`);
+      assert(!existing || existing.role === account.role,
+        `Email đã được sử dụng bởi vai trò khác: ${account.email}`);
     }
     const existingClass = await tx.class.findUnique({
       where: { classCode }, include: { lecturer: true, _count: { select: { enrollments: true } } },
     });
     assert(!existingClass || existingClass.lecturer.email === accounts[1].email,
       'Mã lớp đã được sử dụng bởi giảng viên khác.');
-    assert(!existingClass || existingClass._count.enrollments === 0,
-      'Lớp test đã có sinh viên. Dừng để bảo toàn danh sách hiện có.');
     const users = [];
     for (const account of accounts) {
       users.push(await tx.user.upsert({
         where: { email: account.email },
-        create: { ...account, passwordHash, isActive: true },
-        update: { passwordHash, isActive: true },
+        create: { ...account, passwordHash, isActive: true, isApproved: true },
+        update: { passwordHash, isActive: true, isApproved: true },
         select: { id: true, email: true, role: true },
       }));
     }

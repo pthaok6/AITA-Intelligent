@@ -12,14 +12,14 @@ export class TeamRepository {
     return prisma.team.findUnique({
       where: { id },
       include: {
-        exam: { select: { id: true, title: true, classId: true, examType: true } },
+        exam: { select: { id: true, title: true, classId: true, examType: true, lowerBound: true, upperBound: true } },
         members: {
           include: {
             student: { select: { id: true, fullName: true, email: true } },
             contributions: { orderBy: { syncedAt: 'desc' }, take: 1 },
           },
         },
-        submissions: { orderBy: { attemptNumber: 'desc' }, take: 1 },
+        submissions: { orderBy: { submittedAt: 'desc' }, take: 1 },
       },
     });
   }
@@ -28,6 +28,7 @@ export class TeamRepository {
     return prisma.team.findMany({
       where: { examId },
       include: {
+        exam: { select: { id: true, title: true, classId: true, examType: true, lowerBound: true, upperBound: true } },
         members: {
           include: {
             student: { select: { id: true, fullName: true, email: true } },
@@ -35,7 +36,7 @@ export class TeamRepository {
           },
         },
         submissions: {
-          orderBy: { attemptNumber: 'desc' },
+          orderBy: { submittedAt: 'desc' },
           take: 1,
           select: { id: true, attemptNumber: true, status: true, totalScore: true, submittedAt: true },
         },
@@ -51,6 +52,7 @@ export class TeamRepository {
         members: { some: { studentId } },
       },
       include: {
+        exam: { select: { id: true, title: true, classId: true, examType: true, lowerBound: true, upperBound: true } },
         members: {
           include: { student: { select: { id: true, fullName: true, email: true } } },
         },
@@ -62,13 +64,16 @@ export class TeamRepository {
     return prisma.team.findMany({
       where: { members: { some: { studentId } } },
       include: {
-        exam: { select: { id: true, title: true, classId: true, endTime: true, class: { select: { classCode: true, name: true } } } },
+        exam: { select: { id: true, title: true, classId: true, endTime: true, lowerBound: true, upperBound: true, class: { select: { classCode: true, name: true } } } },
         members: {
-          include: { student: { select: { id: true, fullName: true, email: true } } },
+          include: {
+            student: { select: { id: true, fullName: true, email: true } },
+            contributions: { orderBy: { syncedAt: 'desc' }, take: 1 },
+          },
           orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
         },
         submissions: {
-          orderBy: { attemptNumber: 'desc' },
+          orderBy: { submittedAt: 'desc' },
           take: 1,
           select: { id: true, attemptNumber: true, status: true, totalScore: true, submittedAt: true },
         },
@@ -120,7 +125,17 @@ export class TeamRepository {
     contributionPercent: number;
     personalScore?: number | null;
     isWarning: boolean;
+    syncStatus?: string;
+    syncError?: string | null;
   }) {
+    const existing = await prisma.gitContribution.findUnique({
+      where: { teamId_memberId: { teamId: data.teamId, memberId: data.memberId } },
+    });
+
+    const effectiveScore = existing?.isManualOverride
+      ? existing.personalScore
+      : data.personalScore;
+
     return prisma.gitContribution.upsert({
       where: { teamId_memberId: { teamId: data.teamId, memberId: data.memberId } },
       update: {
@@ -128,8 +143,10 @@ export class TeamRepository {
         locAdded: data.locAdded,
         locDeleted: data.locDeleted,
         contributionPercent: data.contributionPercent,
-        personalScore: data.personalScore,
+        personalScore: effectiveScore,
         isWarning: data.isWarning,
+        syncStatus: data.syncStatus || 'SUCCESS',
+        syncError: data.syncError !== undefined ? data.syncError : null,
         syncedAt: new Date(),
       },
       create: {
@@ -141,6 +158,8 @@ export class TeamRepository {
         contributionPercent: data.contributionPercent,
         personalScore: data.personalScore,
         isWarning: data.isWarning,
+        syncStatus: data.syncStatus || 'SUCCESS',
+        syncError: data.syncError !== undefined ? data.syncError : null,
       },
     });
   }

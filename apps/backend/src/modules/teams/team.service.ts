@@ -3,6 +3,27 @@ import { gitAnalyticsService, GitAnalyticsService } from './git-analytics.servic
 import { prisma } from '../../infrastructure/database/prisma';
 import { HttpError } from '../../shared/http';
 
+export function normalizeRepoUrl(raw: string): string {
+  if (!raw || typeof raw !== 'string') throw new HttpError(400, 'Link repository không được để trống.');
+  const trimmed = raw.trim();
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new HttpError(400, 'Link repository GitHub không hợp lệ.');
+  }
+  if (parsed.protocol !== 'https:' || !['github.com', 'www.github.com'].includes(parsed.hostname.toLowerCase())) {
+    throw new HttpError(400, 'Link repository phải có dạng https://github.com/owner/repository.');
+  }
+  const parts = parsed.pathname.split('/').filter(Boolean);
+  if (parts.length < 2) {
+    throw new HttpError(400, 'Link repository phải có dạng https://github.com/owner/repository.');
+  }
+  const owner = parts[0];
+  const repo = parts[1].replace(/\.git$/i, '');
+  return `https://github.com/${owner}/${repo}`;
+}
+
 export class TeamService {
   constructor(
     private teamRepo: TeamRepository = teamRepository,
@@ -58,13 +79,6 @@ export class TeamService {
       throw new HttpError(400, 'Sinh viên này chưa tham gia hoặc không còn hoạt động trong lớp.');
     }
 
-    // Check if student already in any team of this exam
-    const existingTeam = await this.teamRepo.findTeamByStudent(team.examId, studentId);
-    if (existingTeam) {
-      throw new HttpError(400, `Sinh viên này đã thuộc nhóm "${existingTeam.name}".`);
-    }
-
-    // BR-11: Each team has exactly one active Leader
     let assignedRole = role.toUpperCase() === 'LEADER' ? 'LEADER' : 'MEMBER';
     if (assignedRole === 'LEADER') {
       const hasLeader = team.members.some(m => m.role === 'LEADER');
@@ -72,11 +86,35 @@ export class TeamService {
         throw new HttpError(400, 'Nhóm này đã có Trưởng nhóm (Leader). Mỗi nhóm chỉ có duy nhất 1 Leader (BR-11).');
       }
     } else if (team.members.length === 0) {
-      // First member defaults to LEADER
       assignedRole = 'LEADER';
     }
 
-    return this.teamRepo.addMember(teamId, studentId, assignedRole, githubUsername?.trim() || undefined);
+    return prisma.$transaction(async (tx) => {
+      // UC06: Enforce max team size limit (5 members)
+      const currentCount = await tx.teamMember.count({ where: { teamId } });
+      if (currentCount >= 5) {
+        throw new HttpError(400, 'Nhóm đã đạt số lượng thành viên tối đa (tối đa 5 thành viên).');
+      }
+
+      // Check if student already in another team of this exam
+      const existingInExam = await tx.teamMember.findFirst({
+        where: { studentId, team: { examId: team.examId } },
+        include: { team: true },
+      });
+      if (existingInExam) {
+        throw new HttpError(400, `Sinh viên này đã thuộc nhóm "${existingInExam.team.name}".`);
+      }
+
+      return tx.teamMember.create({
+        data: {
+          teamId,
+          studentId,
+          role: assignedRole,
+          githubUsername: githubUsername?.trim() || null,
+        },
+        include: { student: { select: { id: true, fullName: true, email: true } } },
+      });
+    });
   }
 
   async removeMember(teamId: string, studentId: string) {
@@ -90,7 +128,7 @@ export class TeamService {
     return this.teamRepo.removeMember(teamId, studentId);
   }
 
-  // BR-13: Only Lecturer may change a team's Team Leader; records audit
+  // BR-13: Only Lecturer may change a team's Team Leader; records audit log in database
   async changeLeader(teamId: string, newLeaderStudentId: string, lecturerId: string, reason?: string) {
     const team = await this.teamRepo.findTeamById(teamId);
     if (!team) throw new HttpError(404, 'Không tìm thấy nhóm.');
@@ -111,6 +149,19 @@ export class TeamService {
         where: { id: newLeaderMember.id },
         data: { role: 'LEADER' },
       });
+
+      // Record BR-13 audit log
+      await tx.auditLog.create({
+        data: {
+          action: 'CHANGE_LEADER',
+          entityType: 'TEAM',
+          entityId: teamId,
+          actorId: lecturerId,
+          oldValue: oldLeader?.studentId || null,
+          newValue: newLeaderStudentId,
+          reason: reason || 'Giảng viên chỉ định trưởng nhóm mới (BR-13)',
+        },
+      });
     });
 
     console.log(`[BR-13 Audit] Lecturer ${lecturerId} changed Team ${teamId} Leader from ${oldLeader?.studentId || 'None'} to ${newLeaderStudentId}. Reason: ${reason || 'N/A'}`);
@@ -118,12 +169,47 @@ export class TeamService {
     return this.teamRepo.findTeamById(teamId);
   }
 
-  async updateRepoUrl(teamId: string, repoUrl: string) {
-    return this.teamRepo.updateRepoUrl(teamId, repoUrl.trim());
+  async updateRepoUrl(teamId: string, repoUrl: string, actorId?: string, reason?: string) {
+    const team = await this.getTeamById(teamId);
+    const normalized = normalizeRepoUrl(repoUrl);
+
+    // Enforce uniqueness within this Exam
+    const existing = await prisma.team.findFirst({
+      where: {
+        examId: team.examId,
+        repoUrl: normalized,
+        id: { not: teamId },
+      },
+    });
+    if (existing) {
+      throw new HttpError(400, `Repository này đã được sử dụng bởi nhóm "${existing.name}".`);
+    }
+
+    const updated = await this.teamRepo.updateRepoUrl(teamId, normalized);
+
+    if (actorId) {
+      await prisma.auditLog.create({
+        data: {
+          action: 'UPDATE_REPO',
+          entityType: 'TEAM',
+          entityId: teamId,
+          actorId,
+          oldValue: team.repoUrl,
+          newValue: normalized,
+          reason: reason || 'Cập nhật repository nhóm',
+        },
+      });
+    }
+
+    return updated;
   }
 
   async updateMemberGithub(teamId: string, studentId: string, githubUsername: string) {
-    return this.teamRepo.updateMemberGithub(teamId, studentId, githubUsername.trim());
+    const trimmed = (githubUsername || '').trim();
+    if (trimmed && !/^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$/.test(trimmed)) {
+      throw new HttpError(400, 'GitHub username không hợp lệ.');
+    }
+    return this.teamRepo.updateMemberGithub(teamId, studentId, trimmed || '');
   }
 
   async getTeamsByExam(examId: string) {
@@ -159,16 +245,19 @@ export class TeamService {
   }
 
   // Lecturer manually overrides/grades a student's score
-  async updateMemberScore(teamId: string, studentId: string, score: number) {
-    if (isNaN(score) || score < 0) throw new HttpError(400, 'Điểm số không hợp lệ.');
+  async updateMemberScore(teamId: string, studentId: string, score: number, actorId?: string, reason?: string) {
+    if (isNaN(score) || score < 0 || score > 10) throw new HttpError(400, 'Điểm số phải là số hợp lệ từ 0 đến 10.');
     const member = await prisma.teamMember.findUnique({
       where: { teamId_studentId: { teamId, studentId } },
+      include: { contributions: true },
     });
     if (!member) throw new HttpError(404, 'Không tìm thấy thành viên trong nhóm.');
 
-    return prisma.gitContribution.upsert({
+    const oldScore = member.contributions?.[0]?.personalScore != null ? String(member.contributions[0].personalScore) : null;
+
+    const result = await prisma.gitContribution.upsert({
       where: { teamId_memberId: { teamId, memberId: member.id } },
-      update: { personalScore: score, syncedAt: new Date() },
+      update: { personalScore: score, isManualOverride: true, syncedAt: new Date() },
       create: {
         teamId,
         memberId: member.id,
@@ -178,8 +267,25 @@ export class TeamService {
         contributionPercent: 0,
         personalScore: score,
         isWarning: false,
+        isManualOverride: true,
       },
     });
+
+    if (actorId) {
+      await prisma.auditLog.create({
+        data: {
+          action: 'OVERRIDE_SCORE',
+          entityType: 'TEAM',
+          entityId: teamId,
+          actorId,
+          oldValue: oldScore,
+          newValue: String(score),
+          reason: reason || 'Giảng viên chấm/ghi đè điểm thủ công',
+        },
+      });
+    }
+
+    return result;
   }
 
   async syncGitAnalytics(teamId: string) {
