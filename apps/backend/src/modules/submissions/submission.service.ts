@@ -49,12 +49,48 @@ export class SubmissionService {
     catch (error: any) { console.error('[Submission enqueue pending]', submission.id, error.message); return { ...submission, queuePending: true }; }
     return submission;
   }
-  async submitArchive(examId: string, studentId: string, bytes: Buffer, filename: string, entrypoint?: string, repoUrl?: string) {
+
+  async verifyGitHubCommit(repoUrl: string, commitSha: string): Promise<{ exists: boolean; commitDate?: Date; authorLogin?: string }> {
+    const cleanUrl = repoUrl.trim().replace(/\.git$/, '');
+    const match = cleanUrl.match(/github\.com\/([^/]+)\/([^/]+)/) || cleanUrl.match(/^([^/]+)\/([^/]+)$/);
+    if (!match) return { exists: false };
+    const [_, owner, repo] = match;
+
+    const token = process.env.GITHUB_TOKEN;
+    const headers: Record<string, string> = {
+      'User-Agent': 'AITA-Intelligent-Submission',
+      Accept: 'application/vnd.github.v3+json',
+    };
+    if (token) headers['Authorization'] = `token ${token}`;
+
+    try {
+      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits/${commitSha}`, { headers });
+      if (res.status === 404) return { exists: false };
+      if (!res.ok) {
+        console.warn(`[GitHub verify commit] API returned ${res.status}`);
+        return { exists: true };
+      }
+      const data: any = await res.json();
+      const dateStr = data.commit?.committer?.date || data.commit?.author?.date;
+      return {
+        exists: true,
+        commitDate: dateStr ? new Date(dateStr) : undefined,
+        authorLogin: data.author?.login,
+      };
+    } catch (err: any) {
+      console.warn(`[GitHub verify commit failed] ${err.message}`);
+      return { exists: true };
+    }
+  }
+
+  async submitArchive(examId: string, studentId: string, bytes: Buffer, filename: string, entrypoint?: string, repoUrl?: string, commitSha?: string) {
     if (entrypoint !== undefined && typeof entrypoint !== 'string') throw new HttpError(400, 'Entrypoint phải là chuỗi.');
-    const { exam, teamId, isLate } = await this.authorizeSubmission(examId, studentId);
+    let { exam, teamId, isLate } = await this.authorizeSubmission(examId, studentId);
     let teamRepoUrl: string | undefined;
+    let validatedCommitSha: string | undefined;
+
     if (teamId) {
-      const team = await prisma.team.findUnique({ where: { id: teamId } });
+      const team = await prisma.team.findUnique({ where: { id: teamId }, include: { members: true } });
       if (!team?.repoUrl) {
         throw new HttpError(400, 'Nhóm chưa đăng ký repository GitHub. Vui lòng đăng ký repository trước khi nộp bài.');
       }
@@ -63,6 +99,26 @@ export class SubmissionService {
         throw new HttpError(400, 'Link repository không khớp với repository đã đăng ký của nhóm.');
       }
       teamRepoUrl = team.repoUrl;
+
+      // Validate commitSha if provided
+      if (commitSha && typeof commitSha === 'string' && commitSha.trim()) {
+        const cleanSha = commitSha.trim();
+        if (!/^[a-fA-F0-9]{7,40}$/.test(cleanSha)) {
+          throw new HttpError(400, 'Mã commit SHA không hợp lệ (yêu cầu 7 đến 40 ký tự hex).');
+        }
+
+        const commitCheck = await this.verifyGitHubCommit(teamRepoUrl, cleanSha);
+        if (!commitCheck.exists) {
+          throw new HttpError(400, `Commit SHA "${cleanSha}" không tồn tại trên repository GitHub "${teamRepoUrl}".`);
+        }
+
+        // Check if commit was authored after exam deadline (BR-02 late policy)
+        if (commitCheck.commitDate && commitCheck.commitDate > exam.endTime) {
+          isLate = true;
+        }
+
+        validatedCommitSha = cleanSha;
+      }
     }
 
     const bundle = selectBundle(await readZip(bytes), exam.allowedLanguage, entrypoint);
@@ -81,6 +137,7 @@ export class SubmissionService {
       artifactType: 'ZIP', originalFilename: filename.slice(0, 200), entrypoint: bundle.entrypoint,
       sourceFiles: bundle.files.map(file => ({ path: file.path, size: file.data.length })),
       teamRepoUrl,
+      commitSha: validatedCommitSha,
       status: submissionStatus,
       isLate,
     });

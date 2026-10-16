@@ -64,13 +64,48 @@ class SubmissionService {
         }
         return submission;
     }
-    async submitArchive(examId, studentId, bytes, filename, entrypoint, repoUrl) {
+    async verifyGitHubCommit(repoUrl, commitSha) {
+        const cleanUrl = repoUrl.trim().replace(/\.git$/, '');
+        const match = cleanUrl.match(/github\.com\/([^/]+)\/([^/]+)/) || cleanUrl.match(/^([^/]+)\/([^/]+)$/);
+        if (!match)
+            return { exists: false };
+        const [_, owner, repo] = match;
+        const token = process.env.GITHUB_TOKEN;
+        const headers = {
+            'User-Agent': 'AITA-Intelligent-Submission',
+            Accept: 'application/vnd.github.v3+json',
+        };
+        if (token)
+            headers['Authorization'] = `token ${token}`;
+        try {
+            const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits/${commitSha}`, { headers });
+            if (res.status === 404)
+                return { exists: false };
+            if (!res.ok) {
+                console.warn(`[GitHub verify commit] API returned ${res.status}`);
+                return { exists: true };
+            }
+            const data = await res.json();
+            const dateStr = data.commit?.committer?.date || data.commit?.author?.date;
+            return {
+                exists: true,
+                commitDate: dateStr ? new Date(dateStr) : undefined,
+                authorLogin: data.author?.login,
+            };
+        }
+        catch (err) {
+            console.warn(`[GitHub verify commit failed] ${err.message}`);
+            return { exists: true };
+        }
+    }
+    async submitArchive(examId, studentId, bytes, filename, entrypoint, repoUrl, commitSha) {
         if (entrypoint !== undefined && typeof entrypoint !== 'string')
             throw new http_1.HttpError(400, 'Entrypoint phải là chuỗi.');
-        const { exam, teamId, isLate } = await this.authorizeSubmission(examId, studentId);
+        let { exam, teamId, isLate } = await this.authorizeSubmission(examId, studentId);
         let teamRepoUrl;
+        let validatedCommitSha;
         if (teamId) {
-            const team = await prisma_1.prisma.team.findUnique({ where: { id: teamId } });
+            const team = await prisma_1.prisma.team.findUnique({ where: { id: teamId }, include: { members: true } });
             if (!team?.repoUrl) {
                 throw new http_1.HttpError(400, 'Nhóm chưa đăng ký repository GitHub. Vui lòng đăng ký repository trước khi nộp bài.');
             }
@@ -79,6 +114,22 @@ class SubmissionService {
                 throw new http_1.HttpError(400, 'Link repository không khớp với repository đã đăng ký của nhóm.');
             }
             teamRepoUrl = team.repoUrl;
+            // Validate commitSha if provided
+            if (commitSha && typeof commitSha === 'string' && commitSha.trim()) {
+                const cleanSha = commitSha.trim();
+                if (!/^[a-fA-F0-9]{7,40}$/.test(cleanSha)) {
+                    throw new http_1.HttpError(400, 'Mã commit SHA không hợp lệ (yêu cầu 7 đến 40 ký tự hex).');
+                }
+                const commitCheck = await this.verifyGitHubCommit(teamRepoUrl, cleanSha);
+                if (!commitCheck.exists) {
+                    throw new http_1.HttpError(400, `Commit SHA "${cleanSha}" không tồn tại trên repository GitHub "${teamRepoUrl}".`);
+                }
+                // Check if commit was authored after exam deadline (BR-02 late policy)
+                if (commitCheck.commitDate && commitCheck.commitDate > exam.endTime) {
+                    isLate = true;
+                }
+                validatedCommitSha = cleanSha;
+            }
         }
         const bundle = (0, submission_archive_1.selectBundle)(await (0, submission_archive_1.readZip)(bytes), exam.allowedLanguage, entrypoint);
         const stored = await (0, submission_archive_1.persistArchive)(bytes);
@@ -93,6 +144,7 @@ class SubmissionService {
             artifactType: 'ZIP', originalFilename: filename.slice(0, 200), entrypoint: bundle.entrypoint,
             sourceFiles: bundle.files.map(file => ({ path: file.path, size: file.data.length })),
             teamRepoUrl,
+            commitSha: validatedCommitSha,
             status: submissionStatus,
             isLate,
         });

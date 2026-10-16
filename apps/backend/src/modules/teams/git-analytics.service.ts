@@ -30,7 +30,7 @@ export class GitAnalyticsService {
     return { owner: match[1], repo: match[2] };
   }
 
-  async fetchGitHubStats(owner: string, repo: string): Promise<Record<string, { commits: number; additions: number; deletions: number }>> {
+  async fetchGitHubStats(owner: string, repo: string, cutoffDate?: Date): Promise<Record<string, { commits: number; additions: number; deletions: number }>> {
     const token = process.env.GITHUB_TOKEN;
     const headers: Record<string, string> = {
       'User-Agent': 'AITA-Intelligent-GitAnalytics',
@@ -85,6 +85,36 @@ export class GitAnalyticsService {
         stats[login] = { commits, additions, deletions };
       }
     }
+
+    // Enforce Commit Cutoff (commits created strictly before cutoffDate)
+    if (cutoffDate && !isNaN(cutoffDate.getTime())) {
+      try {
+        const commitsUrl = `https://api.github.com/repos/${owner}/${repo}/commits?until=${cutoffDate.toISOString()}&per_page=100`;
+        const commitsRes = await fetch(commitsUrl, { headers });
+        if (commitsRes.ok) {
+          const commitsList: any = await commitsRes.json();
+          if (Array.isArray(commitsList)) {
+            const validCommitCounts: Record<string, number> = {};
+            for (const c of commitsList) {
+              const login = c?.author?.login?.toLowerCase();
+              if (login) {
+                validCommitCounts[login] = (validCommitCounts[login] || 0) + 1;
+              }
+            }
+            for (const login of Object.keys(stats)) {
+              if (validCommitCounts[login] !== undefined) {
+                stats[login].commits = validCommitCounts[login];
+              } else {
+                stats[login].commits = 0;
+              }
+            }
+          }
+        }
+      } catch (err: any) {
+        console.warn(`[GitAnalytics cutoff check error] ${err.message}`);
+      }
+    }
+
     return stats;
   }
 
@@ -94,6 +124,13 @@ export class GitAnalyticsService {
 
     const members = team.members;
     if (members.length === 0) return [];
+
+    // Cutoff timestamp: commits made after submission (or after exam deadline) should not be counted
+    const latestSubmission = team.submissions && team.submissions.length > 0 ? team.submissions[0] : null;
+    const examEndTime = (team.exam as any)?.endTime ? new Date((team.exam as any).endTime) : null;
+    const cutoffDate: Date | undefined = latestSubmission?.submittedAt
+      ? new Date(latestSubmission.submittedAt)
+      : (examEndTime || undefined);
 
     let gitStats: Record<string, { commits: number; additions: number; deletions: number }> = {};
     const parsed = team.repoUrl ? this.parseRepoOwnerAndName(team.repoUrl) : null;
@@ -106,11 +143,23 @@ export class GitAnalyticsService {
       syncError = 'URL repository GitHub không hợp lệ.';
     } else {
       try {
-        gitStats = await this.fetchGitHubStats(parsed.owner, parsed.repo);
+        gitStats = await this.fetchGitHubStats(parsed.owner, parsed.repo, cutoffDate);
         gitFetchSuccess = true;
       } catch (error: any) {
         syncError = error.message;
         console.warn(`[GitAnalytics] Không thể tải dữ liệu từ GitHub (${error.message}). Ghi nhận đồng bộ thất bại, không tạo số liệu giả.`);
+      }
+    }
+
+    // Author Mapping check: Detect unrecognized external GitHub accounts
+    if (gitFetchSuccess) {
+      const registeredLogins = new Set(
+        members.map(m => m.githubUsername?.trim().toLowerCase()).filter(Boolean)
+      );
+      const unrecognized = Object.keys(gitStats).filter(u => !registeredLogins.has(u));
+      if (unrecognized.length > 0) {
+        const warnText = `⚠️ Có đóng góp từ tài khoản GitHub lạ không thuộc nhóm: @${unrecognized.join(', @')}`;
+        syncError = syncError ? `${syncError} · ${warnText}` : warnText;
       }
     }
 
@@ -147,7 +196,6 @@ export class GitAnalyticsService {
     const totalTeamActivity = memberRecords.reduce((sum, r) => sum + r.activityWeight, 0);
 
     // Latest team submission score (only finalized when status is COMPLETED or COMPILE_ERROR)
-    const latestSubmission = team.submissions && team.submissions.length > 0 ? team.submissions[0] : null;
     const isGradingFinalized = latestSubmission && ['COMPLETED', 'COMPILE_ERROR'].includes(latestSubmission.status);
     const teamScore = isGradingFinalized ? latestSubmission.totalScore : null;
 

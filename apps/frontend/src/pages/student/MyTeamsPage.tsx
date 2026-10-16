@@ -284,6 +284,11 @@ export const MyTeamsPage: React.FC = () => {
                   ) : (
                     <span>Đã nộp bài · Điểm công bố sau {new Date(team.scoreReleaseAt).toLocaleString('vi-VN')}</span>
                   )}
+                  {latestSubmission?.commitSha && (
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      · Commit: <code style={{ color: '#38bdf8' }}>{latestSubmission.commitSha.slice(0, 7)}</code>
+                    </span>
+                  )}
                   {scoreReady && latestSubmission?.id && (
                     <Link className="btn btn-secondary btn-sm" to={`/student/submissions/${latestSubmission.id}`}>
                       Xem chi tiết bài nộp

@@ -14,15 +14,15 @@ const http_1 = require("../../shared/http");
 const submission_archive_1 = require("../../infrastructure/storage/submission-archive");
 const prisma_1 = require("../../infrastructure/database/prisma");
 exports.submissionRouter = (0, express_1.Router)();
-const upload = (0, multer_1.default)({ storage: multer_1.default.memoryStorage(), limits: { fileSize: submission_archive_1.ZIP_LIMIT, files: 1, fields: 2, fieldSize: 512, parts: 3 },
+const upload = (0, multer_1.default)({ storage: multer_1.default.memoryStorage(), limits: { fileSize: submission_archive_1.ZIP_LIMIT, files: 1, fields: 10, fieldSize: 512, parts: 20 },
     fileFilter: (_req, file, done) => /\.zip$/i.test(file.originalname) ? done(null, true) : done(new http_1.HttpError(400, 'Chỉ nhận bài nộp .zip.')) });
 exports.submissionRouter.post('/exams/:examId/submissions', auth_middleware_1.authenticateJwt, (0, http_1.asyncRoute)(async (req, _res, next) => { await submission_service_1.submissionService.authorizeSubmission(String(req.params.examId), req.user.userId); next(); }), upload.single('file'), (0, http_1.asyncRoute)(async (req, res) => {
     if (!req.file)
         throw new http_1.HttpError(400, 'Gửi ZIP ở trường file, dùng multipart/form-data.');
-    const submission = await submission_service_1.submissionService.submitArchive(String(req.params.examId), req.user.userId, req.file.buffer, req.file.originalname, req.body.entrypoint, req.body.repoUrl);
+    const submission = await submission_service_1.submissionService.submitArchive(String(req.params.examId), req.user.userId, req.file.buffer, req.file.originalname, req.body.entrypoint, req.body.repoUrl, req.body.commitSha);
     res.status(201).json({ success: true, data: {
             id: submission.id, examId: submission.examId, submittedAt: submission.submittedAt,
-            status: submission.status, scoreReleased: false,
+            status: submission.status, scoreReleased: false, commitSha: submission.commitSha,
         } });
 }));
 exports.submissionRouter.post('/submissions/:id/approve-late', auth_middleware_1.authenticateJwt, (0, http_1.asyncRoute)(async (req, res) => {

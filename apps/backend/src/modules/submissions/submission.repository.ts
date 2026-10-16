@@ -15,6 +15,7 @@ export class SubmissionRepository {
     entrypoint?: string;
     sourceFiles?: Array<{ path: string; size: number }>;
     teamRepoUrl?: string;
+    commitSha?: string;
     status?: string;
     isLate?: boolean;
   }) {

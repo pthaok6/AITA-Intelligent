@@ -22,6 +22,7 @@ export const ExamTakePage: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [entrypoint, setEntrypoint] = useState('');
   const [repoUrl, setRepoUrl] = useState('');
+  const [commitSha, setCommitSha] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [myTeam, setMyTeam] = useState<any>(null);
@@ -78,7 +79,10 @@ export const ExamTakePage: React.FC = () => {
     const body = new FormData();
     body.append('file', file);
     if (entrypoint.trim()) body.append('entrypoint', entrypoint.trim());
-    if (exam?.examType === 'GROUP') body.append('repoUrl', repoUrl.trim());
+    if (exam?.examType === 'GROUP') {
+      body.append('repoUrl', repoUrl.trim());
+      if (commitSha.trim()) body.append('commitSha', commitSha.trim());
+    }
     const res = await apiRequest('/exams/' + examId + '/submissions', { method: 'POST', body });
     setSubmitting(false);
     if (res.success) navigate('/student/submissions/' + res.data.id);
@@ -165,21 +169,39 @@ export const ExamTakePage: React.FC = () => {
                 </div>
               )}
               {exam.examType === 'GROUP' && (
-                <div className="form-group">
-                  <label htmlFor="team-repository-url">Link repository GitHub của nhóm</label>
-                  <input
-                    id="team-repository-url"
-                    className="form-control"
-                    type="url"
-                    value={repoUrl}
-                    onChange={event => setRepoUrl(event.target.value)}
-                    placeholder="https://github.com/nhom/bai-tap"
-                    required
-                  />
-                  <small style={{ color: 'var(--text-secondary)' }}>
-                    Link repository chính thức đã đăng ký của nhóm dùng để phân tích đóng góp Git.
-                  </small>
-                </div>
+                <>
+                  <div className="form-group">
+                    <label htmlFor="team-repository-url">Link repository GitHub của nhóm</label>
+                    <input
+                      id="team-repository-url"
+                      className="form-control"
+                      type="url"
+                      value={repoUrl}
+                      onChange={event => setRepoUrl(event.target.value)}
+                      placeholder="https://github.com/nhom/bai-tap"
+                      required
+                    />
+                    <small style={{ color: 'var(--text-secondary)' }}>
+                      Link repository chính thức đã đăng ký của nhóm dùng để phân tích đóng góp Git.
+                    </small>
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="team-commit-sha">Commit SHA trên GitHub (Tùy chọn / Khuyên dùng)</label>
+                    <input
+                      id="team-commit-sha"
+                      className="form-control"
+                      type="text"
+                      value={commitSha}
+                      onChange={event => setCommitSha(event.target.value)}
+                      placeholder="Ví dụ: 7a3b4c5 hoặc mã commit 40 ký tự"
+                      pattern="^[a-fA-F0-9]{7,40}$"
+                      title="Mã băm commit GitHub từ 7 đến 40 ký tự hex"
+                    />
+                    <small style={{ color: 'var(--text-secondary)' }}>
+                      Mã băm commit của mã nguồn tương ứng trong file ZIP để đối chiếu tính toàn vẹn với repository.
+                    </small>
+                  </div>
+                </>
               )}
               <button className="btn btn-primary" type="submit" disabled={submitting} style={{ marginTop: '0.5rem' }}>
                 {submitting ? 'Đang tải bài nộp…' : 'Nộp bài và chấm tự động'}

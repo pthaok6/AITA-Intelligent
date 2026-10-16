@@ -296,6 +296,28 @@ test('GROUP EXAM & GIT ANALYTICS SUITE', async (t) => {
         /BR-07: Trùng mã băm SHA-256/
       );
 
+      // Commit SHA verification
+      submissionService.verifyGitHubCommit = async (repo, sha) => {
+        if (sha === 'baddeadbeef') return { exists: false };
+        return { exists: true, authorLogin: 'student1-dev', commitDate: new Date() };
+      };
+
+      const zipWithCommit = new JSZip();
+      zipWithCommit.file('main.py', 'print("Hello with commit")');
+      const zipCommitContent = await zipWithCommit.generateAsync({ type: 'nodebuffer' });
+
+      // Non-existent commit SHA -> Reject
+      await assert.rejects(
+        async () => {
+          await submissionService.submitArchive(tempExam.id, students[1].id, zipCommitContent, 'solution2.zip', entrypoint, validRepo, 'baddeadbeef');
+        },
+        /không tồn tại trên repository/
+      );
+
+      // Valid commit SHA -> Accepted and stored
+      const subWithValidSha = await submissionService.submitArchive(tempExam.id, students[1].id, zipCommitContent, 'solution2.zip', entrypoint, validRepo, 'a1b2c3d4e5f');
+      assert.equal(subWithValidSha.commitSha, 'a1b2c3d4e5f');
+
       // Lecturer approves late submission (BR-02)
       const approvedSub = await submissionService.approveLateSubmission(lateSub.id, lecturer.id);
       assert.equal(approvedSub.status, SubmissionStatus.QUEUED, 'Approved late submission must transition to QUEUED');
@@ -314,7 +336,7 @@ test('GROUP EXAM & GIT ANALYTICS SUITE', async (t) => {
 
       // 5.8a When submission is RUNNING (not finalized)
       await prisma.submission.update({
-        where: { id: lateSub.id },
+        where: { id: subWithValidSha.id },
         data: { status: 'RUNNING' },
       });
       const runningSync = await analytics.syncTeamContributions(team.id);
@@ -323,7 +345,7 @@ test('GROUP EXAM & GIT ANALYTICS SUITE', async (t) => {
 
       // 5.8b When submission is COMPLETED with totalScore 8.0
       await prisma.submission.update({
-        where: { id: lateSub.id },
+        where: { id: subWithValidSha.id },
         data: { status: 'COMPLETED', totalScore: 8.0 },
       });
       const completedSync = await analytics.syncTeamContributions(team.id);
@@ -334,6 +356,15 @@ test('GROUP EXAM & GIT ANALYTICS SUITE', async (t) => {
       // Student 0 has manual override 9.5 from step 5.6 -> Must be preserved!
       assert.equal(student0Completed.isManualOverride, true, 'Student 0 must retain isManualOverride');
       assert.equal(student0Completed.personalScore, 9.5, 'Student 0 must retain lecturer override score 9.5');
+
+      // 5.8c Unrecognized external author detection
+      analytics.fetchGitHubStats = async () => ({
+        'student1-dev': { commits: 10, additions: 200, deletions: 50 },
+        'unknown-external-hacker': { commits: 50, additions: 1000, deletions: 500 },
+      });
+      const alertSync = await analytics.syncTeamContributions(team.id);
+      const student1Alert = alertSync.find(s => s.studentId === students[1].id);
+      assert.match(student1Alert.syncError, /tài khoản GitHub lạ.*unknown-external-hacker/);
 
     } catch (err) {
       console.error('TEST 5 DETAILED ERROR:', err);
@@ -403,6 +434,39 @@ test('GROUP EXAM & GIT ANALYTICS SUITE', async (t) => {
         () => analytics.fetchGitHubStats('org', 'still-computing-repo'),
         /HTTP 202/
       );
+
+      // 6.4 Commit Cutoff: commits created after cutoff are filtered out
+      global.fetch = async (url) => {
+        if (String(url).includes('/stats/contributors')) {
+          return {
+            status: 200,
+            ok: true,
+            json: async () => [
+              {
+                author: { login: 'Alice' },
+                total: 10,
+                weeks: [{ w: 1, a: 100, d: 20, c: 10 }],
+              },
+            ],
+          };
+        }
+        if (String(url).includes('/commits?until=')) {
+          return {
+            status: 200,
+            ok: true,
+            json: async () => [
+              { sha: 'c1', author: { login: 'Alice' } },
+              { sha: 'c2', author: { login: 'Alice' } },
+              { sha: 'c3', author: { login: 'Alice' } },
+              { sha: 'c4', author: { login: 'Alice' } },
+            ],
+          };
+        }
+        return { status: 404, ok: false };
+      };
+
+      const cutoffStats = await analytics.fetchGitHubStats('org', 'cutoff-repo', new Date('2026-10-15T12:00:00Z'));
+      assert.equal(cutoffStats.alice.commits, 4, 'Commits must be filtered down to 4 before cutoff date');
     } finally {
       global.fetch = originalFetch;
     }
