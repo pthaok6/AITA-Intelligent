@@ -11,6 +11,9 @@ export class ExamRepository {
     memoryLimitMb?: number;
     startTime: Date;
     endTime: Date;
+    maxTeamSize?: number;
+    lowerBound?: number;
+    upperBound?: number;
     testCases?: Array<{ inputData: string; expectedOutput: string; isHidden?: boolean; scoreWeight?: number; orderIndex: number }>;
   }) {
     const { testCases, ...examData } = data;
@@ -54,7 +57,7 @@ export class ExamRepository {
     return (await prisma.submission.count({ where: { examId } })) > 0;
   }
 
-  async update(examId: string, data: { title: string; descriptionMd: string; allowedLanguage: string; timeLimitMs: number; memoryLimitMb: number; startTime: Date; endTime: Date }) {
+  async update(examId: string, data: { title: string; descriptionMd: string; allowedLanguage: string; timeLimitMs: number; memoryLimitMb: number; startTime: Date; endTime: Date; maxTeamSize?: number; lowerBound?: number; upperBound?: number }) {
     return prisma.exam.update({ where: { id: examId }, data, include: { testCases: { orderBy: { orderIndex: 'asc' } } } });
   }
 

@@ -38,22 +38,51 @@ export class GitAnalyticsService {
     };
     if (token) headers['Authorization'] = `token ${token}`;
 
-    const url = `https://api.github.com/repos/${owner}/${repo}/contributors`;
-    const response = await fetch(url, { headers });
+    const url = `https://api.github.com/repos/${owner}/${repo}/stats/contributors`;
+    let response: any = null;
+
+    // Retry loop for HTTP 202 (GitHub stats computing in background)
+    for (let attempt = 0; attempt < 3; attempt++) {
+      response = await fetch(url, { headers });
+      if (response.status === 200 || response.status === 204) break;
+      if (response.status === 202) {
+        // Wait 1.5s for GitHub to generate contributor stats
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        continue;
+      }
+      break;
+    }
+
+    if (!response) {
+      throw new Error('Không thể kết nối đến GitHub API.');
+    }
+    if (response.status === 204) {
+      // Empty repository with no commits
+      return {};
+    }
+    if (response.status === 202) {
+      throw new Error('GitHub đang tổng hợp thống kê đóng góp (HTTP 202). Vui lòng thử lại sau giây lát.');
+    }
     if (!response.ok) {
       throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
     }
 
-    const contributors = (await response.json()) as any[];
-    const stats: Record<string, { commits: number; additions: number; deletions: number }> = {};
+    const rawData = await response.json();
+    if (!Array.isArray(rawData)) {
+      return {};
+    }
 
-    for (const c of contributors) {
-      if (c && c.login) {
-        stats[c.login.toLowerCase()] = {
-          commits: c.contributions || 1,
-          additions: (c.contributions || 1) * 25, // Estimated LOC ratio from contributions count
-          deletions: (c.contributions || 1) * 5,
-        };
+    const stats: Record<string, { commits: number; additions: number; deletions: number }> = {};
+    for (const item of rawData) {
+      if (item && item.author && item.author.login) {
+        const login = item.author.login.toLowerCase();
+        const commits = Number.isInteger(item.total)
+          ? item.total
+          : (item.weeks || []).reduce((acc: number, w: any) => acc + (w.c || 0), 0);
+        const additions = (item.weeks || []).reduce((acc: number, w: any) => acc + (w.a || 0), 0);
+        const deletions = (item.weeks || []).reduce((acc: number, w: any) => acc + (w.d || 0), 0);
+
+        stats[login] = { commits, additions, deletions };
       }
     }
     return stats;
@@ -72,7 +101,7 @@ export class GitAnalyticsService {
     let syncError: string | null = null;
 
     if (!team.repoUrl) {
-      syncError = 'Nhóm chưa đăng ký repository GitHub.';
+      syncError = 'Nhóm chưa đăng ký repository GitHub chính thức.';
     } else if (!parsed) {
       syncError = 'URL repository GitHub không hợp lệ.';
     } else {
@@ -100,11 +129,12 @@ export class GitAnalyticsService {
           stats = { commits: 0, additions: 0, deletions: 0 };
         }
       } else {
-        // Never fabricate mock stats when offline/error!
+        // Never fabricate mock stats when offline or on error!
         stats = { commits: 0, additions: 0, deletions: 0 };
       }
 
-      const activityWeight = stats.additions + stats.deletions + stats.commits * 10;
+      // Total activity without arbitrary multipliers: real additions + real deletions + real commits
+      const activityWeight = (stats.additions + stats.deletions) + stats.commits;
       return {
         member: m,
         commits: stats.commits,
@@ -116,9 +146,10 @@ export class GitAnalyticsService {
 
     const totalTeamActivity = memberRecords.reduce((sum, r) => sum + r.activityWeight, 0);
 
-    // Latest team submission score
+    // Latest team submission score (only finalized when status is COMPLETED or COMPILE_ERROR)
     const latestSubmission = team.submissions && team.submissions.length > 0 ? team.submissions[0] : null;
-    const teamScore = latestSubmission && latestSubmission.status === 'COMPLETED' ? latestSubmission.totalScore : null;
+    const isGradingFinalized = latestSubmission && ['COMPLETED', 'COMPILE_ERROR'].includes(latestSubmission.status);
+    const teamScore = isGradingFinalized ? latestSubmission.totalScore : null;
 
     const teamSize = members.length;
     const expectedPercent = teamSize > 0 ? 100 / teamSize : 100;
@@ -140,6 +171,7 @@ export class GitAnalyticsService {
 
     for (const rec of contributionRecords) {
       // BR-12: PersonalScore = TeamScore * clamp(ContributionPercent / (100 / TeamSize), LowerBound, UpperBound)
+      // Only compute official score when sync succeeded, team score is finalized, and team has activity!
       let personalScore: number | null = null;
       if (gitFetchSuccess && teamScore !== null && totalTeamActivity > 0) {
         const factor = expectedPercent > 0 ? rec.contributionPercent / expectedPercent : 1.0;

@@ -300,7 +300,7 @@ export const MyTeamsPage: React.FC = () => {
 
                 {/* GIT ANALYTICS & CONTRIBUTIONS TABLE (BR-05, BR-12) */}
                 <h4 style={{ margin: '1.25rem 0 0.5rem', color: 'var(--text-secondary)' }}>
-                  Bảng đóng góp Git & Điểm cá nhân ({team.members?.length || 0}/5 thành viên)
+                  Bảng đóng góp Git & Điểm cá nhân ({team.members?.length || 0}/{team.exam?.maxTeamSize || 5} thành viên)
                 </h4>
                 <div style={{ overflowX: 'auto' }}>
                   <table className="table" style={{ fontSize: '0.875rem', width: '100%' }}>
@@ -406,12 +406,12 @@ export const MyTeamsPage: React.FC = () => {
                   </table>
                 </div>
 
-                {/* ADD MEMBER SECTION (Leader only, max 5 members) */}
+                {/* ADD MEMBER SECTION (Leader only, max members) */}
                 {isLeader && (
                   <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
-                    {(team.members?.length || 0) >= 5 ? (
+                    {(team.members?.length || 0) >= (team.exam?.maxTeamSize || 5) ? (
                       <div className="badge badge-yellow">
-                        Nhóm đã đạt số lượng thành viên tối đa (5 thành viên).
+                        Nhóm đã đạt số lượng thành viên tối đa ({team.exam?.maxTeamSize || 5} thành viên).
                       </div>
                     ) : (
                       <form onSubmit={event => addMember(event, team)} style={{ display: 'flex', alignItems: 'flex-end', gap: '0.75rem', flexWrap: 'wrap' }}>

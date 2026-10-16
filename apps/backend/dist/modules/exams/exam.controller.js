@@ -22,7 +22,7 @@ exports.examRouter.get('/class/:classId', auth_middleware_1.authenticateJwt, asy
 // Giảng viên tạo đề thi
 exports.examRouter.post('/', auth_middleware_1.authenticateJwt, (0, auth_middleware_1.requireRoles)(enums_1.UserRole.LECTURER), async (req, res) => {
     try {
-        const { classId, title, descriptionMd, allowedLanguage, examType, timeLimitMs, memoryLimitMb, startTime, endTime, testCases } = req.body;
+        const { classId, title, descriptionMd, allowedLanguage, examType, timeLimitMs, memoryLimitMb, startTime, endTime, testCases, maxTeamSize, lowerBound, upperBound } = req.body;
         if (!classId || !title || !descriptionMd || !startTime || !endTime) {
             res.status(400).json({ success: false, message: 'Vui lòng điền đủ thông tin bài thi bắt buộc' });
             return;
@@ -38,6 +38,9 @@ exports.examRouter.post('/', auth_middleware_1.authenticateJwt, (0, auth_middlew
             memoryLimitMb,
             startTime,
             endTime,
+            maxTeamSize: maxTeamSize !== undefined ? Number(maxTeamSize) : undefined,
+            lowerBound: lowerBound !== undefined ? Number(lowerBound) : undefined,
+            upperBound: upperBound !== undefined ? Number(upperBound) : undefined,
             testCases,
         });
         res.status(201).json({ success: true, data: exam });

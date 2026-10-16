@@ -16,6 +16,9 @@ class ExamService {
             throw new Error('Thời gian 1..10000 ms; RAM 64..512 MiB.');
         if (!Number.isFinite(Date.parse(data.startTime)) || !Number.isFinite(Date.parse(data.endTime)) || Date.parse(data.endTime) <= Date.parse(data.startTime))
             throw new Error('Thời gian bắt đầu/kết thúc không hợp lệ.');
+        if (data.maxTeamSize !== undefined && (!Number.isInteger(data.maxTeamSize) || data.maxTeamSize < 2 || data.maxTeamSize > 50)) {
+            throw new Error('Số thành viên tối đa phải từ 2 đến 50.');
+        }
         return this.examRepo.create({
             ...data,
             examType,
@@ -41,6 +44,9 @@ class ExamService {
             throw new Error('Thời gian 1..10000 ms; RAM 64..512 MiB.');
         if (!Number.isFinite(Date.parse(data.startTime)) || !Number.isFinite(Date.parse(data.endTime)) || Date.parse(data.endTime) <= Date.parse(data.startTime))
             throw new Error('Thời gian bắt đầu/kết thúc không hợp lệ.');
+        if (data.maxTeamSize !== undefined && (!Number.isInteger(data.maxTeamSize) || data.maxTeamSize < 2 || data.maxTeamSize > 50)) {
+            throw new Error('Số thành viên tối đa phải từ 2 đến 50.');
+        }
         if (await this.examRepo.hasSubmissions(id))
             throw new Error('Không thể sửa cấu hình đề thi sau khi đã có bài nộp.');
         return this.examRepo.update(id, { ...data, startTime: new Date(data.startTime), endTime: new Date(data.endTime) });

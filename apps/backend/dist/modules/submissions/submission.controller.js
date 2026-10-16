@@ -29,8 +29,10 @@ exports.submissionRouter.post('/submissions/:id/approve-late', auth_middleware_1
     if (req.user.role !== 'LECTURER' && req.user.role !== 'ADMIN') {
         throw new http_1.HttpError(403, 'Chỉ giảng viên mới có quyền duyệt chấm bài nộp muộn.');
     }
-    const submission = await submission_service_1.submissionService.approveLateSubmission(String(req.params.id), req.user.userId);
-    res.json({ success: true, data: submission });
+    const submission = await submission_service_1.submissionService.getSubmission(String(req.params.id));
+    await (0, class_access_1.classAccess)(submission.exam.classId, req.user, true);
+    const updated = await submission_service_1.submissionService.approveLateSubmission(submission.id, req.user.userId);
+    res.json({ success: true, data: updated });
 }));
 async function authorizedSubmission(req) {
     const submission = await submission_service_1.submissionService.getSubmission(String(req.params.id));

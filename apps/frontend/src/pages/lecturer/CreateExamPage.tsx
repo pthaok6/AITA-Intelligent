@@ -26,6 +26,7 @@ export const CreateExamPage: React.FC = () => {
   const [descriptionMd, setDescriptionMd] = useState('');
   const [allowedLanguage, setAllowedLanguage] = useState('PYTHON');
   const [examType, setExamType] = useState('INDIVIDUAL');
+  const [maxTeamSize, setMaxTeamSize] = useState(5);
   const [timeLimitMs, setTimeLimitMs] = useState(2000);
   const [memoryLimitMb, setMemoryLimitMb] = useState(512);
   const [startTime, setStartTime] = useState(() => toLocalInput(new Date()));
@@ -200,6 +201,7 @@ export const CreateExamPage: React.FC = () => {
         descriptionMd,
         allowedLanguage,
         examType,
+        maxTeamSize: examType === 'GROUP' ? Number(maxTeamSize) : undefined,
         timeLimitMs: Number(timeLimitMs),
         memoryLimitMb: Number(memoryLimitMb),
         startTime: startDate.toISOString(),
@@ -394,6 +396,19 @@ export const CreateExamPage: React.FC = () => {
                 <option value="GROUP">Theo nhóm (Team)</option>
               </select>
             </div>
+            {examType === 'GROUP' && (
+              <div className="form-group">
+                <label>Số thành viên tối đa / nhóm</label>
+                <input
+                  type="number"
+                  className="form-control"
+                  value={maxTeamSize}
+                  min={2}
+                  max={20}
+                  onChange={(e) => setMaxTeamSize(Number(e.target.value))}
+                />
+              </div>
+            )}
             <div className="form-group">
               <label>Ngôn ngữ quy định</label>
               <select className="form-control" value={allowedLanguage} onChange={(e) => setAllowedLanguage(e.target.value)}>

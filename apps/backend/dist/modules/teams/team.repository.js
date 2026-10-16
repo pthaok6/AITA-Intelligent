@@ -13,7 +13,7 @@ class TeamRepository {
         return prisma_1.prisma.team.findUnique({
             where: { id },
             include: {
-                exam: { select: { id: true, title: true, classId: true, examType: true, lowerBound: true, upperBound: true } },
+                exam: { select: { id: true, title: true, classId: true, examType: true, lowerBound: true, upperBound: true, maxTeamSize: true } },
                 members: {
                     include: {
                         student: { select: { id: true, fullName: true, email: true } },
@@ -28,7 +28,7 @@ class TeamRepository {
         return prisma_1.prisma.team.findMany({
             where: { examId },
             include: {
-                exam: { select: { id: true, title: true, classId: true, examType: true, lowerBound: true, upperBound: true } },
+                exam: { select: { id: true, title: true, classId: true, examType: true, lowerBound: true, upperBound: true, maxTeamSize: true } },
                 members: {
                     include: {
                         student: { select: { id: true, fullName: true, email: true } },
@@ -51,7 +51,7 @@ class TeamRepository {
                 members: { some: { studentId } },
             },
             include: {
-                exam: { select: { id: true, title: true, classId: true, examType: true, lowerBound: true, upperBound: true } },
+                exam: { select: { id: true, title: true, classId: true, examType: true, lowerBound: true, upperBound: true, maxTeamSize: true } },
                 members: {
                     include: { student: { select: { id: true, fullName: true, email: true } } },
                 },
@@ -62,7 +62,7 @@ class TeamRepository {
         return prisma_1.prisma.team.findMany({
             where: { members: { some: { studentId } } },
             include: {
-                exam: { select: { id: true, title: true, classId: true, endTime: true, lowerBound: true, upperBound: true, class: { select: { classCode: true, name: true } } } },
+                exam: { select: { id: true, title: true, classId: true, endTime: true, lowerBound: true, upperBound: true, maxTeamSize: true, class: { select: { classCode: true, name: true } } } },
                 members: {
                     include: {
                         student: { select: { id: true, fullName: true, email: true } },

@@ -86,6 +86,7 @@ model Exam {
   endTime         DateTime
   lowerBound      Float          @default(0.5)
   upperBound      Float          @default(1.2)
+  maxTeamSize     Int            @default(5)
   createdAt       DateTime       @default(now())
 
   class           Class          @relation(fields: [classId], references: [id], onDelete: Cascade)

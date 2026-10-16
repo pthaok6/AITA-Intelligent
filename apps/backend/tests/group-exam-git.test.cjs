@@ -154,6 +154,7 @@ test('GROUP EXAM & GIT ANALYTICS SUITE', async (t) => {
         examType: 'GROUP',
         lowerBound: 0.5,
         upperBound: 1.2,
+        maxTeamSize: 2,
         startTime: new Date(now.getTime() - 60000),
         endTime: new Date(now.getTime() + 3600000),
       }
@@ -187,6 +188,26 @@ test('GROUP EXAM & GIT ANALYTICS SUITE', async (t) => {
         },
         /đã thuộc nhóm/
       );
+
+      // 5.3b Dynamic maxTeamSize enforcement: maxTeamSize is 2, adding 3rd student must reject
+      await assert.rejects(
+        async () => {
+          await teamService.addMember(team.id, students[2].id, 'MEMBER');
+        },
+        /tối đa/
+      );
+
+      // 5.3c Membership validation: student not in team cannot have github username updated
+      await assert.rejects(
+        async () => {
+          await teamService.updateMemberGithub(team.id, students[2].id, 'student2-git');
+        },
+        /không thuộc nhóm/
+      );
+
+      // 5.3d Valid membership github update
+      const updatedM1 = await teamService.updateMemberGithub(team.id, students[1].id, 'student1-dev');
+      assert.equal(updatedM1.githubUsername, 'student1-dev');
 
       // 5.4 Update repo URL
       const validRepo = 'https://github.com/aita-test/sample-group-repo';
@@ -285,6 +306,35 @@ test('GROUP EXAM & GIT ANALYTICS SUITE', async (t) => {
       });
       assert.ok(lateAudit, 'Audit log for late submission approval must be recorded');
 
+      // 5.8 Finalized score check & Manual score override preservation
+      const analytics = new GitAnalyticsService();
+      analytics.fetchGitHubStats = async () => ({
+        'student1-dev': { commits: 10, additions: 200, deletions: 50 },
+      });
+
+      // 5.8a When submission is RUNNING (not finalized)
+      await prisma.submission.update({
+        where: { id: lateSub.id },
+        data: { status: 'RUNNING' },
+      });
+      const runningSync = await analytics.syncTeamContributions(team.id);
+      const student1Running = runningSync.find(s => s.studentId === students[1].id);
+      assert.equal(student1Running.personalScore, null, 'Personal score must be null while submission is RUNNING');
+
+      // 5.8b When submission is COMPLETED with totalScore 8.0
+      await prisma.submission.update({
+        where: { id: lateSub.id },
+        data: { status: 'COMPLETED', totalScore: 8.0 },
+      });
+      const completedSync = await analytics.syncTeamContributions(team.id);
+      const student1Completed = completedSync.find(s => s.studentId === students[1].id);
+      const student0Completed = completedSync.find(s => s.studentId === students[0].id);
+
+      assert.ok(student1Completed.personalScore !== null, 'Personal score must be computed when COMPLETED');
+      // Student 0 has manual override 9.5 from step 5.6 -> Must be preserved!
+      assert.equal(student0Completed.isManualOverride, true, 'Student 0 must retain isManualOverride');
+      assert.equal(student0Completed.personalScore, 9.5, 'Student 0 must retain lecturer override score 9.5');
+
     } catch (err) {
       console.error('TEST 5 DETAILED ERROR:', err);
       throw err;
@@ -296,6 +346,65 @@ test('GROUP EXAM & GIT ANALYTICS SUITE', async (t) => {
       await prisma.teamMember.deleteMany({ where: { team: { examId: tempExam.id } } });
       await prisma.team.deleteMany({ where: { examId: tempExam.id } });
       await prisma.exam.delete({ where: { id: tempExam.id } });
+    }
+  });
+
+  await t.test('6. GitHub contributor stats parsing, HTTP 202 retry and HTTP 204 empty repo', async () => {
+    const analytics = new GitAnalyticsService();
+    const originalFetch = global.fetch;
+
+    try {
+      // 6.1 HTTP 204 empty repository
+      global.fetch = async () => ({
+        status: 204,
+        ok: true,
+      });
+      const emptyStats = await analytics.fetchGitHubStats('org', 'empty-repo');
+      assert.deepEqual(emptyStats, {}, 'HTTP 204 must return empty object');
+
+      // 6.2 HTTP 202 background computation followed by 200 success
+      let attempts = 0;
+      global.fetch = async () => {
+        attempts++;
+        if (attempts === 1) {
+          return { status: 202, ok: false };
+        }
+        return {
+          status: 200,
+          ok: true,
+          json: async () => [
+            {
+              author: { login: 'DevLead' },
+              total: 8,
+              weeks: [
+                { w: 1, a: 120, d: 30, c: 5 },
+                { w: 2, a: 80, d: 20, c: 3 },
+              ],
+            },
+            {
+              author: { login: 'MemberDev' },
+              total: 3,
+              weeks: [
+                { w: 1, a: 40, d: 10, c: 3 },
+              ],
+            },
+          ],
+        };
+      };
+
+      const parsed = await analytics.fetchGitHubStats('org', 'active-repo');
+      assert.equal(attempts, 2, 'Should have retried after HTTP 202');
+      assert.deepEqual(parsed.devlead, { commits: 8, additions: 200, deletions: 50 });
+      assert.deepEqual(parsed.memberdev, { commits: 3, additions: 40, deletions: 10 });
+
+      // 6.3 Exhausted 202 retries throws error
+      global.fetch = async () => ({ status: 202, ok: false });
+      await assert.rejects(
+        () => analytics.fetchGitHubStats('org', 'still-computing-repo'),
+        /HTTP 202/
+      );
+    } finally {
+      global.fetch = originalFetch;
     }
   });
 

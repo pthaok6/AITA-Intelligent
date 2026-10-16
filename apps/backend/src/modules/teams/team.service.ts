@@ -90,12 +90,6 @@ export class TeamService {
     }
 
     return prisma.$transaction(async (tx) => {
-      // UC06: Enforce max team size limit (5 members)
-      const currentCount = await tx.teamMember.count({ where: { teamId } });
-      if (currentCount >= 5) {
-        throw new HttpError(400, 'Nhóm đã đạt số lượng thành viên tối đa (tối đa 5 thành viên).');
-      }
-
       // Check if student already in another team of this exam
       const existingInExam = await tx.teamMember.findFirst({
         where: { studentId, team: { examId: team.examId } },
@@ -103,6 +97,13 @@ export class TeamService {
       });
       if (existingInExam) {
         throw new HttpError(400, `Sinh viên này đã thuộc nhóm "${existingInExam.team.name}".`);
+      }
+
+      // Enforce max team size limit according to Exam configuration
+      const currentCount = await tx.teamMember.count({ where: { teamId } });
+      const maxMembers = (team.exam as any)?.maxTeamSize || 5;
+      if (currentCount >= maxMembers) {
+        throw new HttpError(400, `Nhóm đã đạt số lượng thành viên tối đa (tối đa ${maxMembers} thành viên theo cấu hình bài thi).`);
       }
 
       return tx.teamMember.create({
@@ -205,6 +206,11 @@ export class TeamService {
   }
 
   async updateMemberGithub(teamId: string, studentId: string, githubUsername: string) {
+    const member = await prisma.teamMember.findUnique({
+      where: { teamId_studentId: { teamId, studentId } },
+    });
+    if (!member) throw new HttpError(404, 'Thành viên không thuộc nhóm này.');
+
     const trimmed = (githubUsername || '').trim();
     if (trimmed && !/^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$/.test(trimmed)) {
       throw new HttpError(400, 'GitHub username không hợp lệ.');

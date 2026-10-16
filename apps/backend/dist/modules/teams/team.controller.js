@@ -5,16 +5,19 @@ const express_1 = require("express");
 const team_service_1 = require("./team.service");
 const team_repository_1 = require("./team.repository");
 const auth_middleware_1 = require("../../middlewares/auth.middleware");
+const class_access_1 = require("../classes/class-access");
 const http_1 = require("../../shared/http");
 exports.teamRouter = (0, express_1.Router)();
 async function authorizeTeamManagement(teamId, user) {
-    if (user.role === 'LECTURER' || user.role === 'ADMIN')
-        return;
     const team = await team_repository_1.teamRepository.findTeamById(teamId);
     if (!team)
         throw new http_1.HttpError(404, 'Không tìm thấy nhóm.');
+    if (user.role === 'LECTURER' || user.role === 'ADMIN') {
+        await (0, class_access_1.classAccess)(team.exam.classId, user, true);
+        return;
+    }
     if (user.role !== 'STUDENT' || !team.members.some(member => member.studentId === user.userId && member.role === 'LEADER')) {
-        throw new http_1.HttpError(403, 'Chỉ trưởng nhóm mới có thể quản lý thành viên.');
+        throw new http_1.HttpError(403, 'Chỉ trưởng nhóm hoặc giảng viên phụ trách mới có thể quản lý thành viên.');
     }
 }
 // Lecturer-created teams, or student-created teams with the creator assigned as leader.
@@ -148,8 +151,12 @@ exports.teamRouter.put('/teams/:teamId/leader', auth_middleware_1.authenticateJw
         const { newLeaderStudentId, reason } = req.body;
         if (!newLeaderStudentId)
             throw new http_1.HttpError(400, 'newLeaderStudentId không được để trống.');
-        const team = await team_service_1.teamService.changeLeader(teamId, newLeaderStudentId, req.user.userId, reason);
-        res.status(200).json({ success: true, data: team });
+        const team = await team_repository_1.teamRepository.findTeamById(teamId);
+        if (!team)
+            throw new http_1.HttpError(404, 'Không tìm thấy nhóm.');
+        await (0, class_access_1.classAccess)(team.exam.classId, req.user, true);
+        const updated = await team_service_1.teamService.changeLeader(teamId, newLeaderStudentId, req.user.userId, reason);
+        res.status(200).json({ success: true, data: updated });
     }
     catch (error) {
         next(error);
@@ -162,14 +169,17 @@ exports.teamRouter.put('/teams/:teamId/repo', auth_middleware_1.authenticateJwt,
         const { repoUrl, reason } = req.body;
         if (!repoUrl)
             throw new http_1.HttpError(400, 'repoUrl không được để trống.');
-        const isLecturer = req.user.role === 'LECTURER' || req.user.role === 'ADMIN';
         const team = await team_repository_1.teamRepository.findTeamById(teamId);
         if (!team)
             throw new http_1.HttpError(404, 'Không tìm thấy nhóm.');
-        if (!isLecturer) {
+        const isLecturer = req.user.role === 'LECTURER' || req.user.role === 'ADMIN';
+        if (isLecturer) {
+            await (0, class_access_1.classAccess)(team.exam.classId, req.user, true);
+        }
+        else {
             const isLeader = team.members.some(member => member.studentId === req.user.userId && member.role === 'LEADER');
             if (!isLeader) {
-                throw new http_1.HttpError(403, 'Chỉ Trưởng nhóm (Team Leader) hoặc giảng viên mới có quyền cập nhật repository.');
+                throw new http_1.HttpError(403, 'Chỉ Trưởng nhóm (Team Leader) hoặc giảng viên phụ trách mới có quyền cập nhật repository.');
             }
         }
         const updated = await team_service_1.teamService.updateRepoUrl(teamId, repoUrl, req.user.userId, reason);
@@ -179,21 +189,27 @@ exports.teamRouter.put('/teams/:teamId/repo', auth_middleware_1.authenticateJwt,
         next(error);
     }
 });
-// UPDATE student's GitHub username (Lecturer or self)
+// UPDATE student's GitHub username (Lecturer, Leader, or self)
 exports.teamRouter.put('/teams/:teamId/members/:studentId/github', auth_middleware_1.authenticateJwt, async (req, res, next) => {
     try {
         const teamId = req.params.teamId;
         const studentId = req.params.studentId;
         const { githubUsername } = req.body;
+        const team = await team_repository_1.teamRepository.findTeamById(teamId);
+        if (!team)
+            throw new http_1.HttpError(404, 'Không tìm thấy nhóm.');
+        const targetMember = team.members.find(member => member.studentId === studentId);
+        if (!targetMember)
+            throw new http_1.HttpError(404, 'Thành viên không thuộc nhóm này.');
         const isLecturer = req.user.role === 'LECTURER' || req.user.role === 'ADMIN';
-        if (!isLecturer && req.user.userId !== studentId) {
-            const team = await team_repository_1.teamRepository.findTeamById(teamId);
-            if (!team)
-                throw new http_1.HttpError(404, 'Không tìm thấy nhóm.');
-            if (!team.members.some(member => member.studentId === studentId))
-                throw new http_1.HttpError(404, 'Thành viên không thuộc nhóm này.');
-            if (!team.members.some(member => member.studentId === req.user.userId && member.role === 'LEADER')) {
-                throw new http_1.HttpError(403, 'Chỉ trưởng nhóm mới có thể cập nhật GitHub username của thành viên khác.');
+        if (isLecturer) {
+            await (0, class_access_1.classAccess)(team.exam.classId, req.user, true);
+        }
+        else {
+            const isSelf = req.user.userId === studentId;
+            const isLeader = team.members.some(member => member.studentId === req.user.userId && member.role === 'LEADER');
+            if (!isSelf && !isLeader) {
+                throw new http_1.HttpError(403, 'Chỉ trưởng nhóm, giảng viên phụ trách hoặc chính sinh viên mới có quyền cập nhật GitHub username.');
             }
         }
         const member = await team_service_1.teamService.updateMemberGithub(teamId, studentId, (githubUsername || '').trim());
@@ -209,6 +225,13 @@ exports.teamRouter.put('/teams/:teamId/members/:studentId/score', auth_middlewar
         const teamId = req.params.teamId;
         const studentId = req.params.studentId;
         const { score, reason } = req.body;
+        const team = await team_repository_1.teamRepository.findTeamById(teamId);
+        if (!team)
+            throw new http_1.HttpError(404, 'Không tìm thấy nhóm.');
+        await (0, class_access_1.classAccess)(team.exam.classId, req.user, true);
+        const targetMember = team.members.find(member => member.studentId === studentId);
+        if (!targetMember)
+            throw new http_1.HttpError(404, 'Thành viên không thuộc nhóm này.');
         const updated = await team_service_1.teamService.updateMemberScore(teamId, studentId, Number(score), req.user.userId, reason);
         res.status(200).json({ success: true, data: updated });
     }
@@ -234,10 +257,15 @@ exports.teamRouter.put('/teams/:teamId/my-github', auth_middleware_1.authenticat
 exports.teamRouter.post('/teams/:teamId/sync-git', auth_middleware_1.authenticateJwt, async (req, res, next) => {
     try {
         const teamId = req.params.teamId;
+        const team = await team_repository_1.teamRepository.findTeamById(teamId);
+        if (!team)
+            throw new http_1.HttpError(404, 'Không tìm thấy nhóm.');
         const isLecturer = req.user.role === 'LECTURER' || req.user.role === 'ADMIN';
-        if (!isLecturer) {
-            const team = await team_repository_1.teamRepository.findTeamById(teamId);
-            if (!team || !team.members.some(m => m.studentId === req.user.userId)) {
+        if (isLecturer) {
+            await (0, class_access_1.classAccess)(team.exam.classId, req.user, true);
+        }
+        else {
+            if (!team.members.some(m => m.studentId === req.user.userId)) {
                 throw new http_1.HttpError(403, 'Bạn không thuộc nhóm này.');
             }
         }
@@ -252,10 +280,15 @@ exports.teamRouter.post('/teams/:teamId/sync-git', auth_middleware_1.authenticat
 exports.teamRouter.get('/teams/:teamId/contributions', auth_middleware_1.authenticateJwt, async (req, res, next) => {
     try {
         const teamId = req.params.teamId;
+        const team = await team_repository_1.teamRepository.findTeamById(teamId);
+        if (!team)
+            throw new http_1.HttpError(404, 'Không tìm thấy nhóm.');
         const isLecturer = req.user.role === 'LECTURER' || req.user.role === 'ADMIN';
-        if (!isLecturer) {
-            const team = await team_repository_1.teamRepository.findTeamById(teamId);
-            if (!team || !team.members.some(m => m.studentId === req.user.userId)) {
+        if (isLecturer) {
+            await (0, class_access_1.classAccess)(team.exam.classId, req.user, true);
+        }
+        else {
+            if (!team.members.some(m => m.studentId === req.user.userId)) {
                 throw new http_1.HttpError(403, 'Bạn không thuộc nhóm này.');
             }
         }
