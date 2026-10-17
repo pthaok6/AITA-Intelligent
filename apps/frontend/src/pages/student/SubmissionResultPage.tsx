@@ -296,6 +296,47 @@ export const SubmissionResultPage: React.FC = () => {
               </a>
             </div>
           )}
+
+          {submission.commitSha && (
+            <div style={{ marginTop: '1rem', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '0.5rem', border: '1px solid #334155' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div>
+                  <strong>🔍 Đối chiếu mã nguồn với GitHub:</strong>{' '}
+                  Commit: <code style={{ color: '#38bdf8' }}>{submission.commitSha.slice(0, 7)}</code>
+                </div>
+                {submission.repoMatchStatus === 'VERIFIED' ? (
+                  <span className="badge badge-green">🟢 Khớp 100% Repository</span>
+                ) : submission.repoMatchStatus === 'PARTIAL' ? (
+                  <span className="badge badge-yellow">🟡 Khớp {submission.repoMatchPercent}% Repository</span>
+                ) : submission.repoMatchStatus === 'MISMATCH' ? (
+                  <span className="badge badge-red">🔴 Bất nhất mã nguồn (0% khớp)</span>
+                ) : (
+                  <span className="badge">⚪ Chưa đối chiếu</span>
+                )}
+              </div>
+              <p style={{ margin: '0.5rem 0 0', fontSize: '0.85rem', color: '#94a3b8' }}>
+                {submission.repoMatchStatus === 'VERIFIED'
+                  ? `Toàn vẹn mã nguồn: 100% file trong ZIP trùng khớp từng byte với commit ${submission.commitSha.slice(0, 7)} trên GitHub.`
+                  : submission.repoMatchStatus === 'PARTIAL'
+                  ? `Mã nguồn trong file ZIP có ${submission.repoMatchPercent}% trùng khớp với commit GitHub. Một số file có sự chỉnh sửa trước khi nén.`
+                  : submission.repoMatchStatus === 'MISMATCH'
+                  ? `⚠️ Cảnh báo bất nhất: Không tìm thấy file mã nguồn tương ứng trong commit ${submission.commitSha.slice(0, 7)} trên GitHub.`
+                  : 'Dữ liệu đối chiếu cây thư mục không khả dụng hoặc repository ở chế độ riêng tư.'}
+              </p>
+              {Array.isArray(submission.repoMatchDetails) && submission.repoMatchDetails.length > 0 && (
+                <div style={{ marginTop: '0.5rem', maxHeight: '120px', overflowY: 'auto', fontSize: '0.8rem', background: '#020617', padding: '0.4rem 0.6rem', borderRadius: '4px' }}>
+                  {submission.repoMatchDetails.map((f: any, idx: number) => (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                      <code>{f.path}</code>
+                      <span style={{ color: f.status === 'MATCHED' ? '#34d399' : f.status === 'MODIFIED' ? '#fbbf24' : '#f87171' }}>
+                        {f.status === 'MATCHED' ? '✓ Khớp 100%' : f.status === 'MODIFIED' ? '✎ Đã sửa đổi' : '✗ Không có trên repo'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

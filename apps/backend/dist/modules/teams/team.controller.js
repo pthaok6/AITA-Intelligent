@@ -78,10 +78,10 @@ exports.teamRouter.get('/exams/:examId/my-team', auth_middleware_1.authenticateJ
 exports.teamRouter.get('/teams/my', auth_middleware_1.authenticateJwt, async (req, res, next) => {
     try {
         const teams = await team_repository_1.teamRepository.findTeamsByStudent(req.user.userId);
-        const data = teams.map(team => {
+        const data = teams.map((team) => {
             const { submissions, ...teamData } = team;
-            const latest = submissions[0];
-            const scoreReleased = req.user.role !== 'STUDENT' || new Date() >= team.exam.endTime;
+            const latest = submissions?.[0];
+            const scoreReleased = req.user.role !== 'STUDENT' || (team.exam && new Date() >= team.exam.endTime);
             return {
                 ...teamData,
                 latestSubmission: latest ? {
@@ -89,10 +89,13 @@ exports.teamRouter.get('/teams/my', auth_middleware_1.authenticateJwt, async (re
                     attemptNumber: latest.attemptNumber,
                     status: latest.status,
                     submittedAt: latest.submittedAt,
+                    commitSha: latest.commitSha,
+                    repoMatchStatus: latest.repoMatchStatus,
+                    repoMatchPercent: latest.repoMatchPercent,
                     scoreReleased,
                     totalScore: scoreReleased ? latest.totalScore : null,
                 } : null,
-                scoreReleaseAt: team.exam.endTime,
+                scoreReleaseAt: team.exam?.endTime,
             };
         });
         res.status(200).json({ success: true, data });

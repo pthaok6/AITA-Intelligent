@@ -64,6 +64,126 @@ class SubmissionService {
         }
         return submission;
     }
+    computeGitBlobSha(content) {
+        const header = Buffer.from(`blob ${content.length}\0`);
+        return crypto_1.default.createHash('sha1').update(Buffer.concat([header, content])).digest('hex');
+    }
+    async verifyZipAgainstRepo(repoUrl, commitSha, sourceFiles, entrypoint) {
+        const cleanUrl = repoUrl.trim().replace(/\.git$/, '');
+        const match = cleanUrl.match(/github\.com\/([^/]+)\/([^/]+)/) || cleanUrl.match(/^([^/]+)\/([^/]+)$/);
+        if (!match || !sourceFiles.length) {
+            return {
+                status: 'UNVERIFIED',
+                matchPercent: null,
+                matchedFiles: 0,
+                totalFiles: sourceFiles.length,
+                details: [],
+                message: 'Không thể xác định repository hoặc không có file mã nguồn.',
+            };
+        }
+        const [_, owner, repo] = match;
+        const token = process.env.GITHUB_TOKEN;
+        const headers = {
+            'User-Agent': 'AITA-Intelligent-Submission',
+            Accept: 'application/vnd.github.v3+json',
+        };
+        if (token)
+            headers['Authorization'] = `token ${token}`;
+        try {
+            const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${commitSha}?recursive=1`, { headers });
+            if (!res.ok) {
+                return {
+                    status: 'UNVERIFIED',
+                    matchPercent: null,
+                    matchedFiles: 0,
+                    totalFiles: sourceFiles.length,
+                    details: [],
+                    message: `Không thể tải cây thư mục từ GitHub (HTTP ${res.status}).`,
+                };
+            }
+            const data = await res.json();
+            const treeItems = data.tree || [];
+            const gitBlobs = new Map();
+            for (const item of treeItems) {
+                if (item.type === 'blob') {
+                    gitBlobs.set(item.path.replace(/\\/g, '/').toLowerCase(), item.sha);
+                }
+            }
+            const details = [];
+            let matchedCount = 0;
+            for (const file of sourceFiles) {
+                const normZipPath = file.path.replace(/\\/g, '/');
+                const zipBlobSha = this.computeGitBlobSha(file.data);
+                let foundGitSha = gitBlobs.get(normZipPath.toLowerCase());
+                if (!foundGitSha) {
+                    const parts = normZipPath.split('/');
+                    if (parts.length > 1) {
+                        foundGitSha = gitBlobs.get(parts.slice(1).join('/').toLowerCase());
+                    }
+                }
+                if (!foundGitSha) {
+                    const baseName = normZipPath.split('/').pop()?.toLowerCase();
+                    if (baseName) {
+                        for (const [gPath, gSha] of gitBlobs.entries()) {
+                            if (gPath.endsWith('/' + baseName) || gPath === baseName) {
+                                foundGitSha = gSha;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (foundGitSha) {
+                    if (foundGitSha.toLowerCase() === zipBlobSha.toLowerCase()) {
+                        matchedCount++;
+                        details.push({ path: normZipPath, status: 'MATCHED', zipBlobSha, gitBlobSha: foundGitSha });
+                    }
+                    else {
+                        details.push({ path: normZipPath, status: 'MODIFIED', zipBlobSha, gitBlobSha: foundGitSha });
+                    }
+                }
+                else {
+                    details.push({ path: normZipPath, status: 'NOT_IN_REPO', zipBlobSha });
+                }
+            }
+            const matchPercent = sourceFiles.length > 0
+                ? Math.round((matchedCount / sourceFiles.length) * 1000) / 10
+                : 0;
+            let status = 'MISMATCH';
+            if (matchPercent === 100) {
+                status = 'VERIFIED';
+            }
+            else if (matchPercent > 0) {
+                status = 'PARTIAL';
+            }
+            else {
+                status = 'MISMATCH';
+            }
+            const message = status === 'VERIFIED'
+                ? `Đã đối chiếu toàn vẹn: 100% mã nguồn trong file ZIP trùng khớp với commit ${commitSha.slice(0, 7)} trên GitHub.`
+                : status === 'PARTIAL'
+                    ? `Đối chiếu một phần: ${matchedCount}/${sourceFiles.length} file trùng khớp (${matchPercent}%). Một số file có sự khác biệt so với commit GitHub.`
+                    : `Cảnh báo bất nhất: Không tìm thấy file mã nguồn của ZIP trong commit ${commitSha.slice(0, 7)} trên repository GitHub (0/${sourceFiles.length} file khớp).`;
+            return {
+                status,
+                matchPercent,
+                matchedFiles: matchedCount,
+                totalFiles: sourceFiles.length,
+                details,
+                message,
+            };
+        }
+        catch (err) {
+            console.warn(`[GitHub verifyZipAgainstRepo error] ${err.message}`);
+            return {
+                status: 'UNVERIFIED',
+                matchPercent: null,
+                matchedFiles: 0,
+                totalFiles: sourceFiles.length,
+                details: [],
+                message: `Lỗi kết nối GitHub khi đối chiếu mã nguồn: ${err.message}`,
+            };
+        }
+    }
     async verifyGitHubCommit(repoUrl, commitSha) {
         const cleanUrl = repoUrl.trim().replace(/\.git$/, '');
         const match = cleanUrl.match(/github\.com\/([^/]+)\/([^/]+)/) || cleanUrl.match(/^([^/]+)\/([^/]+)$/);
@@ -138,6 +258,11 @@ class SubmissionService {
         if (duplicate) {
             throw new http_1.HttpError(400, 'Bài nộp này có nội dung giống hệt bài nộp trước đó (BR-07: Trùng mã băm SHA-256). Vui lòng không nộp lại tệp tin trùng lặp.');
         }
+        // Cross-reference code between ZIP and registered GitHub repo when commitSha is provided
+        let repoMatchResult;
+        if (teamId && teamRepoUrl && validatedCommitSha) {
+            repoMatchResult = await this.verifyZipAgainstRepo(teamRepoUrl, validatedCommitSha, bundle.files, bundle.entrypoint);
+        }
         const submissionStatus = isLate ? enums_1.SubmissionStatus.LATE : enums_1.SubmissionStatus.QUEUED;
         const submission = await this.submissionRepo.create({
             examId, studentId, teamId, sourceCodeUrl: stored.key, fileHashSha256: stored.hash,
@@ -145,6 +270,9 @@ class SubmissionService {
             sourceFiles: bundle.files.map(file => ({ path: file.path, size: file.data.length })),
             teamRepoUrl,
             commitSha: validatedCommitSha,
+            repoMatchStatus: repoMatchResult?.status,
+            repoMatchPercent: repoMatchResult?.matchPercent,
+            repoMatchDetails: repoMatchResult?.details,
             status: submissionStatus,
             isLate,
         });

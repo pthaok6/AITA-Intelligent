@@ -472,6 +472,88 @@ test('GROUP EXAM & GIT ANALYTICS SUITE', async (t) => {
     }
   });
 
+  await t.test('7. ZIP Code and GitHub Repository Cross-Reference Verification', async () => {
+    const originalFetch = global.fetch;
+    const submissionService = new SubmissionService();
+
+    try {
+      const mainPyContent = Buffer.from('print("hello world")\n');
+      const mainPySha = submissionService.computeGitBlobSha(mainPyContent);
+      const helperPyContent = Buffer.from('def add(a, b): return a + b\n');
+      const helperPySha = submissionService.computeGitBlobSha(helperPyContent);
+
+      // 7.1 Exact match: 100% of files match git blobs
+      global.fetch = async (url) => {
+        if (String(url).includes('/git/trees/')) {
+          return {
+            status: 200,
+            ok: true,
+            json: async () => ({
+              sha: 'tree123',
+              tree: [
+                { path: 'main.py', type: 'blob', sha: mainPySha, size: mainPyContent.length },
+                { path: 'helper.py', type: 'blob', sha: helperPySha, size: helperPyContent.length },
+              ],
+            }),
+          };
+        }
+        return { status: 404, ok: false };
+      };
+
+      const result100 = await submissionService.verifyZipAgainstRepo(
+        'https://github.com/my-org/my-project',
+        'c1234567',
+        [
+          { path: 'main.py', data: mainPyContent },
+          { path: 'helper.py', data: helperPyContent },
+        ]
+      );
+      assert.equal(result100.status, 'VERIFIED');
+      assert.equal(result100.matchPercent, 100);
+      assert.equal(result100.matchedFiles, 2);
+      assert.equal(result100.totalFiles, 2);
+
+      // 7.2 Partial match: one file modified
+      const modifiedHelperContent = Buffer.from('def add(a, b): return a - b\n');
+      const resultPartial = await submissionService.verifyZipAgainstRepo(
+        'https://github.com/my-org/my-project',
+        'c1234567',
+        [
+          { path: 'main.py', data: mainPyContent },
+          { path: 'helper.py', data: modifiedHelperContent },
+        ]
+      );
+      assert.equal(resultPartial.status, 'PARTIAL');
+      assert.equal(resultPartial.matchPercent, 50);
+      assert.equal(resultPartial.matchedFiles, 1);
+      assert.equal(resultPartial.details.find(d => d.path === 'helper.py')?.status, 'MODIFIED');
+
+      // 7.3 Complete mismatch: files do not exist on repo
+      const resultMismatch = await submissionService.verifyZipAgainstRepo(
+        'https://github.com/my-org/my-project',
+        'c1234567',
+        [
+          { path: 'unrelated.py', data: Buffer.from('pass\n') },
+        ]
+      );
+      assert.equal(resultMismatch.status, 'MISMATCH');
+      assert.equal(resultMismatch.matchPercent, 0);
+      assert.equal(resultMismatch.matchedFiles, 0);
+
+      // 7.4 Graceful fallback on GitHub API error
+      global.fetch = async () => ({ status: 500, ok: false });
+      const resultFallback = await submissionService.verifyZipAgainstRepo(
+        'https://github.com/my-org/my-project',
+        'c1234567',
+        [{ path: 'main.py', data: mainPyContent }]
+      );
+      assert.equal(resultFallback.status, 'UNVERIFIED');
+      assert.equal(resultFallback.matchPercent, null);
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
   t.after(async () => {
     await prisma.$disconnect();
     setTimeout(() => process.exit(0), 200);

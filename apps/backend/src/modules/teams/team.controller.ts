@@ -68,10 +68,10 @@ teamRouter.get('/exams/:examId/my-team', authenticateJwt, async (req: AuthReques
 teamRouter.get('/teams/my', authenticateJwt, async (req: AuthRequest, res: Response, next) => {
   try {
     const teams = await teamRepository.findTeamsByStudent(req.user!.userId);
-    const data = teams.map(team => {
+    const data = teams.map((team: any) => {
       const { submissions, ...teamData } = team;
-      const latest = submissions[0];
-      const scoreReleased = req.user!.role !== 'STUDENT' || new Date() >= team.exam.endTime;
+      const latest = submissions?.[0];
+      const scoreReleased = req.user!.role !== 'STUDENT' || (team.exam && new Date() >= team.exam.endTime);
       return {
         ...teamData,
         latestSubmission: latest ? {
@@ -79,10 +79,13 @@ teamRouter.get('/teams/my', authenticateJwt, async (req: AuthRequest, res: Respo
           attemptNumber: latest.attemptNumber,
           status: latest.status,
           submittedAt: latest.submittedAt,
+          commitSha: latest.commitSha,
+          repoMatchStatus: latest.repoMatchStatus,
+          repoMatchPercent: latest.repoMatchPercent,
           scoreReleased,
           totalScore: scoreReleased ? latest.totalScore : null,
         } : null,
-        scoreReleaseAt: team.exam.endTime,
+        scoreReleaseAt: team.exam?.endTime,
       };
     });
     res.status(200).json({ success: true, data });

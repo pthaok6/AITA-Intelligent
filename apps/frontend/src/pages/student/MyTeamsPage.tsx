@@ -287,6 +287,15 @@ export const MyTeamsPage: React.FC = () => {
                   {latestSubmission?.commitSha && (
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                       · Commit: <code style={{ color: '#38bdf8' }}>{latestSubmission.commitSha.slice(0, 7)}</code>
+                      {latestSubmission.repoMatchStatus === 'VERIFIED' && (
+                        <span className="badge badge-green" style={{ marginLeft: '0.4rem', fontSize: '0.75rem' }}>🟢 Khớp Repo 100%</span>
+                      )}
+                      {latestSubmission.repoMatchStatus === 'PARTIAL' && (
+                        <span className="badge badge-yellow" style={{ marginLeft: '0.4rem', fontSize: '0.75rem' }}>🟡 Khớp Repo {latestSubmission.repoMatchPercent}%</span>
+                      )}
+                      {latestSubmission.repoMatchStatus === 'MISMATCH' && (
+                        <span className="badge badge-red" style={{ marginLeft: '0.4rem', fontSize: '0.75rem' }}>🔴 Lệch Repo (0%)</span>
+                      )}
                     </span>
                   )}
                   {scoreReady && latestSubmission?.id && (

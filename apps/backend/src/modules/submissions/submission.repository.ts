@@ -16,10 +16,13 @@ export class SubmissionRepository {
     sourceFiles?: Array<{ path: string; size: number }>;
     teamRepoUrl?: string;
     commitSha?: string;
+    repoMatchStatus?: string;
+    repoMatchPercent?: number | null;
+    repoMatchDetails?: any;
     status?: string;
     isLate?: boolean;
   }) {
-    const { sourceFiles, teamRepoUrl, ...submissionData } = data;
+    const { sourceFiles, teamRepoUrl, repoMatchStatus, repoMatchPercent, repoMatchDetails, ...submissionData } = data;
     for (let retry = 0; ; retry++) {
       try {
         return await prisma.$transaction(async tx => {
@@ -35,7 +38,7 @@ export class SubmissionRepository {
                 select: { attemptNumber: true },
               });
 
-          return tx.submission.create({
+          const created = await tx.submission.create({
             data: {
               ...submissionData,
               attemptNumber: (latest?.attemptNumber ?? 0) + 1,
@@ -44,6 +47,23 @@ export class SubmissionRepository {
               ...(sourceFiles ? { sourceFiles: { create: sourceFiles } } : {}),
             },
           });
+
+          if (repoMatchStatus || repoMatchPercent !== undefined) {
+            await tx.$executeRawUnsafe(
+              'UPDATE "submissions" SET "repoMatchStatus" = $1, "repoMatchPercent" = $2, "repoMatchDetails" = $3::jsonb WHERE id = $4',
+              repoMatchStatus || null,
+              repoMatchPercent ?? null,
+              repoMatchDetails ? JSON.stringify(repoMatchDetails) : null,
+              created.id
+            );
+          }
+
+          return {
+            ...created,
+            repoMatchStatus,
+            repoMatchPercent,
+            repoMatchDetails,
+          };
         }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
       } catch (error: any) {
         if (retry >= 2 || !['P2002', 'P2034'].includes(error?.code)) throw error;
@@ -72,7 +92,7 @@ export class SubmissionRepository {
   }
 
   async findById(id: string) {
-    return prisma.submission.findUnique({
+    const sub = await prisma.submission.findUnique({
       where: { id },
       include: {
         _count: { select: { fingerprints: true } },
@@ -87,6 +107,22 @@ export class SubmissionRepository {
         },
       },
     });
+    if (!sub) return null;
+    try {
+      const rawMatches: any = await prisma.$queryRawUnsafe(
+        'SELECT "repoMatchStatus", "repoMatchPercent", "repoMatchDetails" FROM "submissions" WHERE id = $1',
+        id
+      );
+      const extra = rawMatches?.[0] || {};
+      return {
+        ...sub,
+        repoMatchStatus: extra.repoMatchStatus,
+        repoMatchPercent: extra.repoMatchPercent,
+        repoMatchDetails: extra.repoMatchDetails,
+      };
+    } catch {
+      return sub;
+    }
   }
 
   async findByExamId(examId: string, studentId?: string) {

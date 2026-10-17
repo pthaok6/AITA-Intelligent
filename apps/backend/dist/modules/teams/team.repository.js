@@ -38,7 +38,7 @@ class TeamRepository {
                 submissions: {
                     orderBy: { submittedAt: 'desc' },
                     take: 1,
-                    select: { id: true, attemptNumber: true, status: true, totalScore: true, submittedAt: true, commitSha: true },
+                    select: { id: true, attemptNumber: true, status: true, totalScore: true, submittedAt: true, commitSha: true, repoMatchStatus: true, repoMatchPercent: true },
                 },
             },
             orderBy: { name: 'asc' },
@@ -73,7 +73,7 @@ class TeamRepository {
                 submissions: {
                     orderBy: { submittedAt: 'desc' },
                     take: 1,
-                    select: { id: true, attemptNumber: true, status: true, totalScore: true, submittedAt: true, commitSha: true },
+                    select: { id: true, attemptNumber: true, status: true, totalScore: true, submittedAt: true, commitSha: true, repoMatchStatus: true, repoMatchPercent: true },
                 },
             },
             orderBy: { createdAt: 'desc' },
