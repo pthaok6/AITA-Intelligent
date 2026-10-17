@@ -7,7 +7,8 @@ import { useAuth } from '../../contexts/AuthContext';
 const isGithubRepositoryUrl = (value: string) => {
   try {
     const url = new URL(value);
-    return ['github.com', 'www.github.com'].includes(url.hostname.toLowerCase())
+    return url.protocol === 'https:'
+      && ['github.com', 'www.github.com'].includes(url.hostname.toLowerCase())
       && url.pathname.split('/').filter(Boolean).length >= 2;
   } catch {
     return false;
@@ -22,7 +23,6 @@ export const ExamTakePage: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [entrypoint, setEntrypoint] = useState('');
   const [repoUrl, setRepoUrl] = useState('');
-  const [commitSha, setCommitSha] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [myTeam, setMyTeam] = useState<any>(null);
@@ -61,29 +61,33 @@ export const ExamTakePage: React.FC = () => {
       setError('Chỉ trưởng nhóm mới có quyền nộp bài cho nhóm.');
       return;
     }
-    if (!file || !file.name.toLowerCase().endsWith('.zip')) {
+    const isGroupSubmission = exam?.examType === 'GROUP';
+    if (isGroupSubmission && !isGithubRepositoryUrl(repoUrl.trim())) {
+      setError('Nhóm chưa có repository GitHub hợp lệ. Hãy đăng ký repository tại trang Nhóm của tôi.');
+      return;
+    }
+    if (!isGroupSubmission && (!file || !file.name.toLowerCase().endsWith('.zip'))) {
       setError('Chọn file .zip chứa mã nguồn.');
       return;
     }
-    if (file.size > 25 * 1024 * 1024) {
+    if (!isGroupSubmission && file && file.size > 25 * 1024 * 1024) {
       setError('ZIP tối đa 25 MiB.');
       return;
     }
-    if (exam?.examType === 'GROUP' && !isGithubRepositoryUrl(repoUrl.trim())) {
-      setError('Nhập URL repository GitHub hợp lệ, ví dụ https://github.com/nhom/bai-tap.');
-      return;
-    }
-
     setSubmitting(true);
     setError('');
-    const body = new FormData();
-    body.append('file', file);
-    if (entrypoint.trim()) body.append('entrypoint', entrypoint.trim());
-    if (exam?.examType === 'GROUP') {
-      body.append('repoUrl', repoUrl.trim());
-      if (commitSha.trim()) body.append('commitSha', commitSha.trim());
-    }
-    const res = await apiRequest('/exams/' + examId + '/submissions', { method: 'POST', body });
+    const res = isGroupSubmission
+      ? await apiRequest('/exams/' + examId + '/submissions/from-git', {
+        method: 'POST', body: JSON.stringify({ repoUrl: repoUrl.trim(), entrypoint: entrypoint.trim() || undefined }),
+      })
+      : await apiRequest('/exams/' + examId + '/submissions', {
+        method: 'POST', body: (() => {
+          const body = new FormData();
+          if (file) body.append('file', file);
+          if (entrypoint.trim()) body.append('entrypoint', entrypoint.trim());
+          return body;
+        })(),
+      });
     setSubmitting(false);
     if (res.success) navigate('/student/submissions/' + res.data.id);
     else setError(res.message || 'Không nộp được bài.');
@@ -127,37 +131,31 @@ export const ExamTakePage: React.FC = () => {
             <div className="card">
               <h3 style={{ marginTop: 0 }}>Bạn là thành viên nhóm {myTeam.name}</h3>
               <p style={{ color: 'var(--text-secondary)' }}>
-                Chỉ Trưởng nhóm ({teamLeader?.student?.fullName || 'Trưởng nhóm'}) mới có quyền nộp bài đại diện cho cả nhóm (BR-11).
+                Chỉ Trưởng nhóm ({teamLeader?.student?.fullName || 'Trưởng nhóm'}) mới có quyền nộp bài đại diện cho cả nhóm.
                 Quản lý thành viên và GitHub username tại <Link to="/student/teams">Nhóm của tôi</Link>.
               </p>
             </div>
           ) : (
             <form className="card" onSubmit={submit}>
-              {exam.examType === 'GROUP' && isLeader && (
-                <div style={{ marginBottom: '1rem', padding: '0.75rem', background: 'rgba(14, 165, 233, 0.15)', border: '1px solid #0284c7', borderRadius: 'var(--radius-control)' }}>
-                  <strong style={{ color: '#38bdf8' }}>👑 Bạn là Trưởng nhóm ({myTeam.name}).</strong>
-                  <p style={{ margin: '0.25rem 0 0', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                    Bạn có quyền nộp bài cho cả nhóm. Repository đăng ký chính thức: <code>{myTeam.repoUrl || 'Chưa đăng ký'}</code>
-                  </p>
-                </div>
-              )}
-              <h3>Nộp bài dạng ZIP</h3>
-              <p>ZIP tối đa 25 MiB, giải nén tối đa 50 MiB. Chỉ mã nguồn được đưa vào môi trường chạy.</p>
+              <h3>{exam.examType === 'GROUP' ? 'Nộp bài từ GitHub' : 'Nộp bài dạng ZIP'}</h3>
+              {exam.examType === 'GROUP'
+                ? <p>Hệ thống lấy mã nguồn mới nhất trên nhánh mặc định của repository nhóm đã đăng ký tại thời điểm nộp. Commit được ghi nhận để cố định phiên bản đem đi chấm.</p>
+                : <p>ZIP tối đa 25 MiB, giải nén tối đa 50 MiB. Chỉ mã nguồn được đưa vào môi trường chạy.</p>}
               <p>
                 {exam.allowedLanguage === 'PYTHON'
-                  ? 'Python: đặt main.py và các module .py vào ZIP. Dùng thư viện chuẩn.'
+                  ? exam.examType === 'GROUP' ? 'Python: đặt main.py và các module .py trong repository. Dùng thư viện chuẩn.' : 'Python: đặt main.py và các module .py vào ZIP. Dùng thư viện chuẩn.'
                   : exam.allowedLanguage === 'JAVA'
-                  ? 'Java 17: ZIP chứa Main.java và các file .java. Không dùng thư viện ngoài.'
-                  : 'C# .NET 8: ZIP chứa các file .cs có Main hoặc top-level statements. Dự án được biên dịch bằng cấu hình của hệ thống.'}
+                  ? exam.examType === 'GROUP' ? 'Java 17: repository cần có Main.java và các file .java. Không dùng thư viện ngoài.' : 'Java 17: ZIP chứa Main.java và các file .java. Không dùng thư viện ngoài.'
+                  : exam.examType === 'GROUP' ? 'C# .NET 8: repository cần có các file .cs có Main hoặc top-level statements.' : 'C# .NET 8: ZIP chứa các file .cs có Main hoặc top-level statements. Dự án được biên dịch bằng cấu hình của hệ thống.'}
               </p>
-              <div className="form-group">
+              {exam.examType !== 'GROUP' && <div className="form-group">
                 <label htmlFor="submission-zip">Tệp bài làm (.zip)</label>
                 <input id="submission-zip" className="form-control" type="file" accept=".zip,application/zip" required onChange={event => setFile(event.target.files?.[0] || null)} />
-              </div>
+              </div>}
               {exam.allowedLanguage !== 'CSHARP' && (
                 <div className="form-group">
                   <label htmlFor="entrypoint">
-                    {exam.allowedLanguage === 'JAVA' ? 'Tên lớp chạy chính (mặc định Main)' : 'File chạy chính trong ZIP (tự tìm main.py)'}
+                    {exam.allowedLanguage === 'JAVA' ? 'Tên lớp chạy chính (mặc định Main)' : exam.examType === 'GROUP' ? 'File chạy chính trong repository (tự tìm main.py)' : 'File chạy chính trong ZIP (tự tìm main.py)'}
                   </label>
                   <input
                     id="entrypoint"
@@ -182,23 +180,7 @@ export const ExamTakePage: React.FC = () => {
                       required
                     />
                     <small style={{ color: 'var(--text-secondary)' }}>
-                      Link repository chính thức đã đăng ký của nhóm dùng để phân tích đóng góp Git.
-                    </small>
-                  </div>
-                  <div className="form-group">
-                    <label htmlFor="team-commit-sha">Commit SHA trên GitHub (Tùy chọn / Khuyên dùng)</label>
-                    <input
-                      id="team-commit-sha"
-                      className="form-control"
-                      type="text"
-                      value={commitSha}
-                      onChange={event => setCommitSha(event.target.value)}
-                      placeholder="Ví dụ: 7a3b4c5 hoặc mã commit 40 ký tự"
-                      pattern="^[a-fA-F0-9]{7,40}$"
-                      title="Mã băm commit GitHub từ 7 đến 40 ký tự hex"
-                    />
-                    <small style={{ color: 'var(--text-secondary)' }}>
-                      Mã băm commit của mã nguồn tương ứng trong file ZIP để đối chiếu tính toàn vẹn với repository.
+                      Bạn có thể nhập lại link GitHub; hệ thống lấy commit mới nhất trên nhánh mặc định của link này.
                     </small>
                   </div>
                 </>

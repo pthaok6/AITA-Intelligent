@@ -24,6 +24,17 @@ submissionRouter.post('/exams/:examId/submissions', authenticateJwt,
     } });
   }));
 
+submissionRouter.post('/exams/:examId/submissions/from-git', authenticateJwt, asyncRoute(async (req: AuthRequest, res) => {
+  const { repoUrl, entrypoint } = req.body || {};
+  if (typeof repoUrl !== 'string') throw new HttpError(400, 'Vui lòng nhập link repository GitHub.');
+  if (entrypoint !== undefined && typeof entrypoint !== 'string') throw new HttpError(400, 'Entrypoint phải là chuỗi.');
+  const submission = await submissionService.submitFromGitHub(String(req.params.examId), req.user!.userId, repoUrl, entrypoint);
+  res.status(201).json({ success: true, data: {
+    id: submission.id, examId: submission.examId, submittedAt: submission.submittedAt,
+    status: submission.status, scoreReleased: false, commitSha: submission.commitSha,
+  } });
+}));
+
 submissionRouter.post('/submissions/:id/approve-late', authenticateJwt, asyncRoute(async (req: AuthRequest, res) => {
   if (req.user!.role !== 'LECTURER' && req.user!.role !== 'ADMIN') {
     throw new HttpError(403, 'Chỉ giảng viên mới có quyền duyệt chấm bài nộp muộn.');

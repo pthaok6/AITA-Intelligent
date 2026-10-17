@@ -13,6 +13,7 @@ export const EditExamPage: React.FC = () => {
   const navigate = useNavigate();
   const [form, setForm] = useState<ExamForm | null>(null);
   const [cases, setCases] = useState<TestCase[]>([]);
+  const [hasSubmissions, setHasSubmissions] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -23,6 +24,7 @@ export const EditExamPage: React.FC = () => {
     void apiRequest<any>(`/exams/${examId}`).then(result => {
       if (!result.success || !result.data) { setError(result.message || 'Không tải được đề thi.'); setLoading(false); return; }
       const exam = result.data;
+      setHasSubmissions((exam._count?.submissions || 0) > 0);
       setForm({ title: exam.title, descriptionMd: exam.descriptionMd, allowedLanguage: exam.allowedLanguage, timeLimitMs: exam.timeLimitMs, memoryLimitMb: exam.memoryLimitMb, startTime: localInput(exam.startTime), endTime: localInput(exam.endTime) });
       setCases(exam.testCases.map((test: any) => ({ id: test.id, inputData: test.inputData, expectedOutput: test.expectedOutput, isHidden: test.isHidden, scoreWeight: test.scoreWeight, orderIndex: test.orderIndex })));
       setLoading(false);
@@ -49,10 +51,12 @@ export const EditExamPage: React.FC = () => {
     setSaving(true); setError('');
     const examResult = await apiRequest(`/exams/${examId}`, { method: 'PATCH', body: JSON.stringify({ ...form, timeLimitMs: Number(form.timeLimitMs), memoryLimitMb: Number(form.memoryLimitMb), startTime: new Date(form.startTime).toISOString(), endTime: new Date(form.endTime).toISOString() }) });
     if (!examResult.success) { setError(examResult.message || 'Không cập nhật được đề thi.'); setSaving(false); return; }
-    for (const item of cases) {
+    if (!hasSubmissions) {
+      for (const item of cases) {
       const { id, ...payload } = item;
       const result = await apiRequest(id ? `/exams/${examId}/testcases/${id}` : `/exams/${examId}/testcases`, { method: id ? 'PATCH' : 'POST', body: JSON.stringify(payload) });
       if (!result.success) { setError(result.message || 'Đề đã lưu nhưng có test case chưa cập nhật.'); setSaving(false); return; }
+    }
     }
     setSaving(false); navigate(`/lecturer/classes/${classId}/exams`);
   };
@@ -75,11 +79,12 @@ export const EditExamPage: React.FC = () => {
           <div className="form-group"><label>Bắt đầu</label><input className="form-control" type="datetime-local" value={form.startTime} onChange={e => setForm({ ...form, startTime: e.target.value })} /></div>
           <div className="form-group"><label>Kết thúc</label><input className="form-control" type="datetime-local" value={form.endTime} onChange={e => setForm({ ...form, endTime: e.target.value })} /></div>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '1rem 0' }}><h3>Test case</h3><button type="button" className="btn btn-secondary" onClick={() => setCases([...cases, { inputData: '', expectedOutput: '', isHidden: false, scoreWeight: 1, orderIndex: Math.max(0, ...cases.map(item => item.orderIndex)) + 1 }])}>+ Thêm test case</button></div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '1rem 0' }}><h3>Test case</h3><button type="button" className="btn btn-secondary" disabled={hasSubmissions} onClick={() => setCases([...cases, { inputData: '', expectedOutput: '', isHidden: false, scoreWeight: 1, orderIndex: Math.max(0, ...cases.map(item => item.orderIndex)) + 1 }])}>+ Thêm test case</button></div>
+        {hasSubmissions && <p role="note" style={{ color: '#fbbf24', marginBottom: '1rem' }}>Đề đã có bài nộp: có thể sửa cấu hình đề, nhưng bộ test bị khóa để bảo toàn kết quả chấm hiện có.</p>}
         {cases.map((item, index) => <div className="card" key={item.id || `new-${index}`} style={{ marginBottom: '0.75rem' }}>
-          <div className="form-group"><label>Dữ liệu đầu vào</label><textarea className="form-control" value={item.inputData} onChange={e => updateCase(index, 'inputData', e.target.value)} /></div>
-          <div className="form-group"><label>Kết quả mong đợi</label><textarea className="form-control" value={item.expectedOutput} onChange={e => updateCase(index, 'expectedOutput', e.target.value)} /></div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}><label><input type="checkbox" checked={item.isHidden} onChange={e => updateCase(index, 'isHidden', e.target.checked)} /> Test ẩn</label><label>Trọng số <input type="number" min="0.1" step="0.1" value={item.scoreWeight} onChange={e => updateCase(index, 'scoreWeight', Number(e.target.value))} /></label><button type="button" className="btn btn-ghost-danger btn-sm" onClick={() => setPendingDeleteCase(item)}>Xóa test</button></div>
+          <div className="form-group"><label>Dữ liệu đầu vào</label><textarea className="form-control" disabled={hasSubmissions} value={item.inputData} onChange={e => updateCase(index, 'inputData', e.target.value)} /></div>
+          <div className="form-group"><label>Kết quả mong đợi</label><textarea className="form-control" disabled={hasSubmissions} value={item.expectedOutput} onChange={e => updateCase(index, 'expectedOutput', e.target.value)} /></div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}><label><input type="checkbox" disabled={hasSubmissions} checked={item.isHidden} onChange={e => updateCase(index, 'isHidden', e.target.checked)} /> Test ẩn</label><label>Trọng số <input type="number" min="0.1" step="0.1" disabled={hasSubmissions} value={item.scoreWeight} onChange={e => updateCase(index, 'scoreWeight', Number(e.target.value))} /></label><button type="button" className="btn btn-ghost-danger btn-sm" disabled={hasSubmissions} onClick={() => setPendingDeleteCase(item)}>Xóa test</button></div>
         </div>)}
         {cases.length === 0 && <p>Cần thêm ít nhất một test case trước khi lưu.</p>}
         <button className="btn btn-primary" disabled={saving || cases.length === 0}>{saving ? 'Đang lưu…' : 'Lưu thay đổi'}</button>

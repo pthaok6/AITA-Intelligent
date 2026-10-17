@@ -18,7 +18,7 @@ function readSeen(key: string): Set<string> {
 }
 
 export function getUnreadAppealCount(appeals: AppealNotice[], userId: string): number {
-  const seen = readSeen(userId);
+  const seen = readSeen(storageKey(userId));
   return appeals.filter(appeal => appeal.status !== 'SUBMITTED' && !seen.has(signature(appeal))).length;
 }
 

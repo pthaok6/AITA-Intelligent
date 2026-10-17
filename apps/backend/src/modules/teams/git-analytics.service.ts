@@ -218,7 +218,7 @@ export class GitAnalyticsService {
     const results: MemberStats[] = [];
 
     for (const rec of contributionRecords) {
-      // BR-12: PersonalScore = TeamScore * clamp(ContributionPercent / (100 / TeamSize), LowerBound, UpperBound)
+      // Personal score is the team score adjusted by contribution and configured bounds.
       // Only compute official score when sync succeeded, team score is finalized, and team has activity!
       let personalScore: number | null = null;
       if (gitFetchSuccess && teamScore !== null && totalTeamActivity > 0) {

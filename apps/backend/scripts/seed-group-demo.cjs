@@ -37,7 +37,7 @@ async function main() {
 
   const studentFreerider = await db.user.upsert({
     where: { email: 'student.test04@fpt.edu.vn' },
-    create: { email: 'student.test04@fpt.edu.vn', fullName: 'Phạm Đức Lười (Cảnh báo Free-rider BR-05)', passwordHash, role: 'STUDENT', isActive: true },
+    create: { email: 'student.test04@fpt.edu.vn', fullName: 'Phạm Đức Lười (Cảnh báo Free-rider)', passwordHash, role: 'STUDENT', isActive: true },
     update: { passwordHash, isActive: true }
   });
 
@@ -90,9 +90,9 @@ Hệ thống yêu cầu các nhóm xây dựng module xử lý tính tổng hai 
 - Giới hạn thời gian: 2.0 giây.
 - Giới hạn bộ nhớ: 512 MB.
 
-### Quy định nộp bài theo nhóm (BR-11, BR-12)
+### Quy định nộp bài theo nhóm
 1. **Quyền nộp bài**: Chỉ **Trưởng nhóm (Team Leader)** mới có quyền nộp bài đại diện cho nhóm. Các thành viên khác nếu nộp sẽ bị hệ thống từ chối.
-2. **Chấm điểm cá nhân**: Sau khi nộp bài và chấm điểm kiểm thử tự động, Giảng viên sẽ kích hoạt phân tích lịch sử commit trên GitHub repo của nhóm để phân chia điểm số cá nhân theo tỉ lệ đóng góp (BR-12). Thành viên có tỉ lệ đóng góp $< 5\\%$ sẽ bị cảnh báo vi phạm quy chế làm việc nhóm (BR-05).
+2. **Chấm điểm cá nhân**: Sau khi nộp bài và chấm điểm kiểm thử tự động, Giảng viên sẽ kích hoạt phân tích lịch sử commit trên GitHub repo của nhóm để phân chia điểm số cá nhân theo tỉ lệ đóng góp. Thành viên có tỉ lệ đóng góp $< 5\\%$ sẽ bị cảnh báo vi phạm quy chế làm việc nhóm.
 `,
     allowedLanguage: 'PYTHON',
     examType: 'GROUP',

@@ -91,7 +91,7 @@ class TeamService {
         if (assignedRole === 'LEADER') {
             const hasLeader = team.members.some(m => m.role === 'LEADER');
             if (hasLeader) {
-                throw new http_1.HttpError(400, 'Nhóm này đã có Trưởng nhóm (Leader). Mỗi nhóm chỉ có duy nhất 1 Leader (BR-11).');
+                throw new http_1.HttpError(400, 'Nhóm này đã có Trưởng nhóm (Leader). Mỗi nhóm chỉ có duy nhất 1 Leader.');
             }
         }
         else if (team.members.length === 0) {
@@ -130,11 +130,11 @@ class TeamService {
         if (!member)
             throw new http_1.HttpError(404, 'Không tìm thấy thành viên trong nhóm.');
         if (member.role === 'LEADER') {
-            throw new http_1.HttpError(400, 'Không thể xóa Trưởng nhóm. Vui lòng chuyển quyền Leader cho thành viên khác trước (BR-11).');
+            throw new http_1.HttpError(400, 'Không thể xóa Trưởng nhóm. Vui lòng chuyển quyền Leader cho thành viên khác trước.');
         }
         return this.teamRepo.removeMember(teamId, studentId);
     }
-    // BR-13: Only Lecturer may change a team's Team Leader; records audit log in database
+    // Only a lecturer may change a team's leader; each change is recorded.
     async changeLeader(teamId, newLeaderStudentId, lecturerId, reason) {
         const team = await this.teamRepo.findTeamById(teamId);
         if (!team)
@@ -154,7 +154,7 @@ class TeamService {
                 where: { id: newLeaderMember.id },
                 data: { role: 'LEADER' },
             });
-            // Record BR-13 audit log
+            // Record an audit log.
             await tx.auditLog.create({
                 data: {
                     action: 'CHANGE_LEADER',
@@ -163,11 +163,11 @@ class TeamService {
                     actorId: lecturerId,
                     oldValue: oldLeader?.studentId || null,
                     newValue: newLeaderStudentId,
-                    reason: reason || 'Giảng viên chỉ định trưởng nhóm mới (BR-13)',
+                    reason: reason || 'Giảng viên chỉ định trưởng nhóm mới',
                 },
             });
         });
-        console.log(`[BR-13 Audit] Lecturer ${lecturerId} changed Team ${teamId} Leader from ${oldLeader?.studentId || 'None'} to ${newLeaderStudentId}. Reason: ${reason || 'N/A'}`);
+        console.log(`Lecturer ${lecturerId} changed Team ${teamId} Leader from ${oldLeader?.studentId || 'None'} to ${newLeaderStudentId}. Reason: ${reason || 'N/A'}`);
         return this.teamRepo.findTeamById(teamId);
     }
     async updateRepoUrl(teamId, repoUrl, actorId, reason) {

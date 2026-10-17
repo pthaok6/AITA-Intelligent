@@ -11,6 +11,7 @@ dist/
 *.db-shm
 *.db-wal
 apps/backend/storage/
+apps/backend/tests/
 apps/backend/storage-test-*/
 ref
 apps/frontend/node_modules/

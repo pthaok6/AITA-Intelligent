@@ -72,7 +72,7 @@ export const StudentDashboard: React.FC = () => {
         <div className="student-dashboard-actions" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           {user?.role === 'STUDENT' && <Link to="/student/teams" className="btn btn-secondary">Nhóm của tôi</Link>}
           <Link to="/student/appeals" className="btn btn-secondary">
-            Đơn khiếu nại điểm của tôi
+            Khiếu nại
             {unreadAppealCount > 0 && <span className="notification-count" aria-label={`${unreadAppealCount} khiếu nại có cập nhật mới`}>{unreadAppealCount > 99 ? '99+' : unreadAppealCount}</span>}
           </Link>
         </div>

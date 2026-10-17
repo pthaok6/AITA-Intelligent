@@ -297,7 +297,7 @@ export const SubmissionResultPage: React.FC = () => {
             </div>
           )}
 
-          {submission.commitSha && (
+          {/* {submission.commitSha && (
             <div style={{ marginTop: '1rem', padding: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', borderRadius: '0.5rem', border: '1px solid #334155' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <div>
@@ -336,7 +336,7 @@ export const SubmissionResultPage: React.FC = () => {
                 </div>
               )}
             </div>
-          )}
+          )} */}
         </div>
       </div>
 

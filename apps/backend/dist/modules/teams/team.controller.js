@@ -147,7 +147,7 @@ exports.teamRouter.delete('/teams/:teamId/members/:studentId', auth_middleware_1
         next(error);
     }
 });
-// BR-13: LECTURER changes team leader
+// Lecturer changes team leader
 exports.teamRouter.put('/teams/:teamId/leader', auth_middleware_1.authenticateJwt, (0, auth_middleware_1.requireRoles)('LECTURER', 'ADMIN'), async (req, res, next) => {
     try {
         const teamId = req.params.teamId;
@@ -256,7 +256,7 @@ exports.teamRouter.put('/teams/:teamId/my-github', auth_middleware_1.authenticat
         next(error);
     }
 });
-// UC19: Trigger Git Analytics sync & BR-12 scoring
+// Trigger Git Analytics sync and scoring
 exports.teamRouter.post('/teams/:teamId/sync-git', auth_middleware_1.authenticateJwt, async (req, res, next) => {
     try {
         const teamId = req.params.teamId;

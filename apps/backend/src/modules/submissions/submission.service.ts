@@ -7,7 +7,7 @@ import { HttpError } from '../../shared/http';
 import { IJobQueue } from '../../infrastructure/queue/job-queue.interface';
 import { readZip, selectBundle, persistArchive } from '../../infrastructure/storage/submission-archive';
 
-import { normalizeRepoUrl } from '../teams/team.service';
+import { normalizeRepoUrl, teamService } from '../teams/team.service';
 import { SubmissionStatus } from '../../domain/enums';
 
 export class SubmissionService {
@@ -34,7 +34,7 @@ export class SubmissionService {
       }
       const membership = team.members.find(m => m.studentId === studentId);
       if (!membership || membership.role !== 'LEADER') {
-        throw new HttpError(403, 'Chỉ Trưởng nhóm (Team Leader) mới có quyền nộp bài cho nhóm (BR-11).');
+        throw new HttpError(403, 'Chỉ Trưởng nhóm (Team Leader) mới có quyền nộp bài cho nhóm.');
       }
       if (!team.repoUrl) {
         throw new HttpError(400, 'Nhóm chưa đăng ký repository GitHub. Vui lòng đăng ký repository tại trang Nhóm của tôi trước khi nộp bài.');
@@ -59,7 +59,8 @@ export class SubmissionService {
     repoUrl: string,
     commitSha: string,
     sourceFiles: Array<{ path: string; data: Buffer }>,
-    entrypoint?: string
+    entrypoint?: string,
+    treeSha?: string
   ): Promise<{
     status: 'VERIFIED' | 'PARTIAL' | 'MISMATCH' | 'UNVERIFIED';
     matchPercent: number | null;
@@ -90,7 +91,43 @@ export class SubmissionService {
     if (token) headers['Authorization'] = `token ${token}`;
 
     try {
-      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${commitSha}?recursive=1`, { headers });
+      let resolvedTreeSha = treeSha;
+      let res: Response | null = null;
+      if (!resolvedTreeSha) {
+        // Older callers may pass only the commit SHA. Try the tree endpoint first,
+        // then resolve the commit's tree SHA if GitHub rejects it as a tree SHA.
+        const directTreeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${commitSha}?recursive=1`, { headers });
+        if (directTreeRes.ok) {
+          res = directTreeRes;
+          resolvedTreeSha = commitSha;
+        } else {
+          const commitRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits/${commitSha}`, { headers });
+          if (!commitRes.ok) {
+            return {
+              status: 'UNVERIFIED',
+              matchPercent: null,
+              matchedFiles: 0,
+              totalFiles: sourceFiles.length,
+              details: [],
+              message: `Không thể tải commit ${commitSha.slice(0, 7)} từ GitHub (HTTP ${commitRes.status}).`,
+            };
+          }
+          const commitData: any = await commitRes.json();
+          resolvedTreeSha = commitData.commit?.tree?.sha;
+        }
+      }
+      if (!resolvedTreeSha) {
+        return {
+          status: 'UNVERIFIED',
+          matchPercent: null,
+          matchedFiles: 0,
+          totalFiles: sourceFiles.length,
+          details: [],
+          message: `Không tìm thấy tree SHA cho commit ${commitSha.slice(0, 7)} trên GitHub.`,
+        };
+      }
+
+      if (!res) res = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${resolvedTreeSha}?recursive=1`, { headers });
       if (!res.ok) {
         return {
           status: 'UNVERIFIED',
@@ -188,7 +225,7 @@ export class SubmissionService {
     }
   }
 
-  async verifyGitHubCommit(repoUrl: string, commitSha: string): Promise<{ exists: boolean; commitDate?: Date; authorLogin?: string }> {
+  async verifyGitHubCommit(repoUrl: string, commitSha: string): Promise<{ exists: boolean; commitDate?: Date; authorLogin?: string; treeSha?: string }> {
     const cleanUrl = repoUrl.trim().replace(/\.git$/, '');
     const match = cleanUrl.match(/github\.com\/([^/]+)\/([^/]+)/) || cleanUrl.match(/^([^/]+)\/([^/]+)$/);
     if (!match) return { exists: false };
@@ -217,6 +254,7 @@ export class SubmissionService {
         exists: true,
         commitDate: dateStr ? new Date(dateStr) : undefined,
         authorLogin: data.author?.login,
+        treeSha: data.commit?.tree?.sha,
       };
     } catch (err: any) {
       console.warn(`[GitHub verify commit failed] ${err.message}`);
@@ -224,22 +262,25 @@ export class SubmissionService {
     }
   }
 
-  async submitArchive(examId: string, studentId: string, bytes: Buffer, filename: string, entrypoint?: string, repoUrl?: string, commitSha?: string) {
+  async submitArchive(examId: string, studentId: string, bytes: Buffer, filename: string, entrypoint?: string, repoUrl?: string, commitSha?: string, allowRepoOverride = false) {
     if (entrypoint !== undefined && typeof entrypoint !== 'string') throw new HttpError(400, 'Entrypoint phải là chuỗi.');
     let { exam, teamId, isLate } = await this.authorizeSubmission(examId, studentId);
     let teamRepoUrl: string | undefined;
+    let registeredTeamRepoUrl: string | undefined;
     let validatedCommitSha: string | undefined;
+    let validatedTreeSha: string | undefined;
 
     if (teamId) {
       const team = await prisma.team.findUnique({ where: { id: teamId }, include: { members: true } });
       if (!team?.repoUrl) {
         throw new HttpError(400, 'Nhóm chưa đăng ký repository GitHub. Vui lòng đăng ký repository trước khi nộp bài.');
       }
+      registeredTeamRepoUrl = team.repoUrl;
       // If repoUrl was supplied in submission request, check against registered canonical repository
-      if (repoUrl && normalizeRepoUrl(repoUrl) !== normalizeRepoUrl(team.repoUrl)) {
+      if (repoUrl && !allowRepoOverride && normalizeRepoUrl(repoUrl) !== normalizeRepoUrl(team.repoUrl)) {
         throw new HttpError(400, 'Link repository không khớp với repository đã đăng ký của nhóm.');
       }
-      teamRepoUrl = team.repoUrl;
+      teamRepoUrl = allowRepoOverride && repoUrl ? repoUrl.trim() : team.repoUrl;
 
       // Validate commitSha if provided
       if (commitSha && typeof commitSha === 'string' && commitSha.trim()) {
@@ -253,23 +294,18 @@ export class SubmissionService {
           throw new HttpError(400, `Commit SHA "${cleanSha}" không tồn tại trên repository GitHub "${teamRepoUrl}".`);
         }
 
-        // Check if commit was authored after exam deadline (BR-02 late policy)
+        // Check if the commit was authored after the exam deadline.
         if (commitCheck.commitDate && commitCheck.commitDate > exam.endTime) {
           isLate = true;
         }
 
         validatedCommitSha = cleanSha;
+        validatedTreeSha = commitCheck.treeSha;
       }
     }
 
     const bundle = selectBundle(await readZip(bytes), exam.allowedLanguage, entrypoint);
     const stored = await persistArchive(bytes);
-
-    // BR-07: Duplicate submission detection by SHA-256
-    const duplicate = await this.submissionRepo.findByFileHash(examId, stored.hash, teamId, studentId);
-    if (duplicate) {
-      throw new HttpError(400, 'Bài nộp này có nội dung giống hệt bài nộp trước đó (BR-07: Trùng mã băm SHA-256). Vui lòng không nộp lại tệp tin trùng lặp.');
-    }
 
     // Cross-reference code between ZIP and registered GitHub repo when commitSha is provided
     let repoMatchResult: {
@@ -284,12 +320,18 @@ export class SubmissionService {
         teamRepoUrl,
         validatedCommitSha,
         bundle.files,
-        bundle.entrypoint
+        bundle.entrypoint,
+        validatedTreeSha
       );
 
       if (repoMatchResult && repoMatchResult.status === 'MISMATCH') {
         throw new HttpError(400, 'Bài nộp bị từ chối: Toàn bộ mã nguồn trong tệp ZIP không trùng khớp với Git Tree tại commit đã chọn trên repository GitHub của nhóm (Phát hiện sai lệch mã nguồn). Vui lòng đồng bộ mã nguồn trước khi nộp.');
       }
+    }
+
+    if (allowRepoOverride && teamId && teamRepoUrl && registeredTeamRepoUrl
+      && normalizeRepoUrl(teamRepoUrl) !== normalizeRepoUrl(registeredTeamRepoUrl)) {
+      await teamService.updateRepoUrl(teamId, teamRepoUrl, studentId, 'Cập nhật từ link repository khi nộp bài');
     }
 
     const submissionStatus = isLate ? SubmissionStatus.LATE : SubmissionStatus.QUEUED;
@@ -307,11 +349,88 @@ export class SubmissionService {
       isLate,
     });
 
-    // BR-02: Late submissions require lecturer approval before autograding
+    // Late submissions require lecturer approval before autograding.
     if (isLate) {
       return submission;
     }
     return this.enqueue(submission);
+  }
+
+  async submitFromGitHub(examId: string, studentId: string, submittedRepoUrl: string, entrypoint?: string) {
+    const { teamId } = await this.authorizeSubmission(examId, studentId);
+    if (!teamId) throw new HttpError(400, 'Chỉ bài tập nhóm mới nộp trực tiếp từ GitHub.');
+    const team = await prisma.team.findUnique({ where: { id: teamId }, select: { repoUrl: true } });
+    if (!team?.repoUrl) throw new HttpError(400, 'Nhóm chưa đăng ký repository GitHub.');
+    let submittedRepo: URL;
+    try {
+      submittedRepo = new URL(submittedRepoUrl);
+    } catch {
+      throw new HttpError(400, 'Link repository GitHub không hợp lệ.');
+    }
+    const repoParts = submittedRepo.pathname.split('/').filter(Boolean);
+    if (submittedRepo.protocol !== 'https:' || submittedRepo.username || submittedRepo.password
+      || !['github.com', 'www.github.com'].includes(submittedRepo.hostname.toLowerCase()) || repoParts.length !== 2) {
+      throw new HttpError(400, 'Nhập link repository dạng https://github.com/owner/repository.');
+    }
+    const [owner, repoWithGit] = repoParts;
+    const repo = repoWithGit.replace(/\.git$/i, '');
+    if (!owner || !repo) throw new HttpError(400, 'Link repository GitHub không hợp lệ.');
+    const headers: Record<string, string> = {
+      'User-Agent': 'AITA-Intelligent-Submission',
+      Accept: 'application/vnd.github+json',
+    };
+    if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+    let cleanSha: string;
+    try {
+      const latestCommitResponse = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?per_page=1`, { headers });
+      if (!latestCommitResponse.ok) {
+        throw new HttpError(latestCommitResponse.status === 404 ? 400 : 502,
+          latestCommitResponse.status === 404
+            ? 'Không tìm thấy repository hoặc nhánh mặc định trên GitHub (repository riêng tư cần GITHUB_TOKEN).'
+            : `GitHub không trả được commit hiện tại (HTTP ${latestCommitResponse.status}).`);
+      }
+      const commits: any = await latestCommitResponse.json();
+      cleanSha = commits?.[0]?.sha;
+      if (!cleanSha || !/^[a-fA-F0-9]{40}$/.test(cleanSha)) {
+        throw new HttpError(400, 'Repository không có commit nào trên nhánh mặc định để nộp.');
+      }
+    } catch (error: any) {
+      if (error instanceof HttpError) throw error;
+      throw new HttpError(502, `Không thể lấy commit hiện tại từ GitHub: ${error.message}`);
+    }
+    let response: Response;
+    try {
+      response = await fetch(`https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/zipball/${encodeURIComponent(cleanSha)}`, { headers });
+    } catch (error: any) {
+      throw new HttpError(502, `Không thể tải mã nguồn từ GitHub: ${error.message}`);
+    }
+    if (!response.ok || !response.body) {
+      throw new HttpError(response.status === 404 ? 400 : 502, response.status === 404
+        ? 'Không tìm thấy commit trên repository GitHub (hoặc repository riêng tư chưa cấu hình GITHUB_TOKEN).'
+        : `GitHub không trả được mã nguồn (HTTP ${response.status}).`);
+    }
+    const contentLength = Number(response.headers.get('content-length') || 0);
+    if (contentLength > 25 * 1024 * 1024) throw new HttpError(413, 'Mã nguồn GitHub vượt giới hạn 25 MiB.');
+    const reader = response.body.getReader();
+    const chunks: Buffer[] = [];
+    let size = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > 25 * 1024 * 1024) {
+          await reader.cancel();
+          throw new HttpError(413, 'Mã nguồn GitHub vượt giới hạn 25 MiB.');
+        }
+        chunks.push(Buffer.from(value));
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    const archive = Buffer.concat(chunks, size);
+    const canonicalRepoUrl = `https://github.com/${owner}/${repo}`;
+    return this.submitArchive(examId, studentId, archive, `github-${cleanSha.slice(0, 12)}.zip`, entrypoint, canonicalRepoUrl, cleanSha, true);
   }
   // Compatibility for explicit mock tests only. The HTTP API accepts ZIP exclusively.
   async submitCode(examId: string, studentId: string, sourceCode: string) {
@@ -339,7 +458,7 @@ export class SubmissionService {
         entityId: submissionId,
         actorId: lecturerId,
         newValue: 'APPROVED',
-        reason: 'Giảng viên duyệt chấm bài nộp muộn (BR-02)',
+        reason: 'Giảng viên duyệt chấm bài nộp muộn',
       },
     });
     return this.enqueue(updated);

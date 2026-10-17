@@ -345,7 +345,7 @@ export const ExamSubmissionsPage: React.FC = () => {
             </form>
           )}
 
-          {/* SECTION: GROUP TEAMS & GIT ANALYTICS (UC19, UC20, BR-05, BR-12) */}
+          {/* GROUP TEAMS & GIT ANALYTICS */}
           {selectedExam?.examType === 'GROUP' && (
             <div className="card team-analysis-panel">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -488,7 +488,7 @@ export const ExamSubmissionsPage: React.FC = () => {
                                           </div>
                                           {contrib.isWarning && (
                                             <span className="badge badge-red" style={{ fontSize: '0.68rem', display: 'inline-block', marginTop: '3px' }} title="Đóng góp dưới 5% tổng hoạt động nhóm">
-                                              ⚠️ &lt; 5% (BR-05)
+                                              ⚠️ &lt; 5%
                                             </span>
                                           )}
                                         </div>

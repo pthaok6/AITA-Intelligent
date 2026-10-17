@@ -172,7 +172,10 @@ export class RblService {
       }
     }
 
-    const reports = await prisma.plagiarismReport.findMany({ where: { examId } });
+    const latestIds = latestList.map(submission => submission.id);
+    const reports = await prisma.plagiarismReport.findMany({
+      where: { examId, submissionAId: { in: latestIds }, submissionBId: { in: latestIds } },
+    });
     return {
       totalSubmissions: latestList.length,
       analyzedCount,

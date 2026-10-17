@@ -47,8 +47,6 @@ class ExamService {
         if (data.maxTeamSize !== undefined && (!Number.isInteger(data.maxTeamSize) || data.maxTeamSize < 2 || data.maxTeamSize > 50)) {
             throw new Error('Số thành viên tối đa phải từ 2 đến 50.');
         }
-        if (await this.examRepo.hasSubmissions(id))
-            throw new Error('Không thể sửa cấu hình đề thi sau khi đã có bài nộp.');
         return this.examRepo.update(id, { ...data, startTime: new Date(data.startTime), endTime: new Date(data.endTime) });
     }
     async deleteExam(id) { return this.examRepo.deleteIfNoSubmissions(id); }

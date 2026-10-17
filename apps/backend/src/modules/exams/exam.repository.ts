@@ -35,6 +35,7 @@ export class ExamRepository {
           where: includeHiddenTestCases ? undefined : { isHidden: false },
           orderBy: { orderIndex: 'asc' },
         },
+        ...(includeHiddenTestCases ? { _count: { select: { submissions: true } } } : {}),
       },
     });
   }

@@ -183,7 +183,10 @@ class RblService {
                 await this.comparePair(latestList[i].id, latestList[j].id, examId);
             }
         }
-        const reports = await prisma_1.prisma.plagiarismReport.findMany({ where: { examId } });
+        const latestIds = latestList.map(submission => submission.id);
+        const reports = await prisma_1.prisma.plagiarismReport.findMany({
+            where: { examId, submissionAId: { in: latestIds }, submissionBId: { in: latestIds } },
+        });
         return {
             totalSubmissions: latestList.length,
             analyzedCount,

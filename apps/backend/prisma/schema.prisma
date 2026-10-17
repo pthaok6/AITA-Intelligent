@@ -294,8 +294,8 @@ model GitContribution {
   locAdded            Int          @default(0)
   locDeleted          Int          @default(0)
   contributionPercent Float        @default(0.0) // 0.0 - 100.0%
-  personalScore       Float?       // Derived per BR-12: TeamScore * ContributionFactor
-  isWarning           Boolean      @default(false) // BR-05: true if contributionPercent < 5.0%
+  personalScore       Float?       // Team score adjusted by the member contribution factor.
+  isWarning           Boolean      @default(false) // True when contribution is below 5%.
   isManualOverride    Boolean      @default(false)
   syncStatus          String       @default("SUCCESS") // SUCCESS, FAILED, PENDING
   syncError           String?

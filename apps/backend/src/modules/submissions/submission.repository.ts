@@ -71,19 +71,6 @@ export class SubmissionRepository {
     }
   }
 
-  async findByFileHash(examId: string, fileHashSha256: string, teamId?: string, studentId?: string) {
-    const whereClause: any = { examId, fileHashSha256 };
-    if (teamId) {
-      whereClause.teamId = teamId;
-    } else if (studentId) {
-      whereClause.studentId = studentId;
-    }
-    return prisma.submission.findFirst({
-      where: whereClause,
-      select: { id: true, attemptNumber: true, status: true, submittedAt: true },
-    });
-  }
-
   async findLatestForTeam(examId: string, teamId: string) {
     return prisma.submission.findFirst({
       where: { examId, teamId },
