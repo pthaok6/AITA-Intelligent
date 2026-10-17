@@ -199,13 +199,16 @@ class SubmissionService {
             headers['Authorization'] = `token ${token}`;
         try {
             const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits/${commitSha}`, { headers });
-            if (res.status === 404)
+            if (res.status === 404 || res.status === 422)
                 return { exists: false };
+            const data = await res.json().catch(() => null);
+            if (data && data.message && typeof data.message === 'string' && data.message.includes('No commit found')) {
+                return { exists: false };
+            }
             if (!res.ok) {
                 console.warn(`[GitHub verify commit] API returned ${res.status}`);
                 return { exists: true };
             }
-            const data = await res.json();
             const dateStr = data.commit?.committer?.date || data.commit?.author?.date;
             return {
                 exists: true,
@@ -262,6 +265,9 @@ class SubmissionService {
         let repoMatchResult;
         if (teamId && teamRepoUrl && validatedCommitSha) {
             repoMatchResult = await this.verifyZipAgainstRepo(teamRepoUrl, validatedCommitSha, bundle.files, bundle.entrypoint);
+            if (repoMatchResult && repoMatchResult.status === 'MISMATCH') {
+                throw new http_1.HttpError(400, 'Bài nộp bị từ chối: Toàn bộ mã nguồn trong tệp ZIP không trùng khớp với Git Tree tại commit đã chọn trên repository GitHub của nhóm (Phát hiện sai lệch mã nguồn). Vui lòng đồng bộ mã nguồn trước khi nộp.');
+            }
         }
         const submissionStatus = isLate ? enums_1.SubmissionStatus.LATE : enums_1.SubmissionStatus.QUEUED;
         const submission = await this.submissionRepo.create({
