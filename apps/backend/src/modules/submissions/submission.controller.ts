@@ -7,6 +7,7 @@ import { examService } from '../exams/exam.service';
 import { asyncRoute, HttpError } from '../../shared/http';
 import { archivePath, ZIP_LIMIT } from '../../infrastructure/storage/submission-archive';
 import { prisma } from '../../infrastructure/database/prisma';
+import { rblService } from '../rbl/rbl.service';
 
 export const submissionRouter = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: ZIP_LIMIT, files: 1, fields: 10, fieldSize: 512, parts: 20 },
@@ -123,4 +124,32 @@ submissionRouter.get('/submissions/:id/fingerprints', authenticateJwt, asyncRout
   const submission = await authorizedSubmission(req);
   const fingerprints = await prisma.aSTFingerprint.findMany({ where: { submissionId: submission.id }, orderBy: [{ sourcePath: 'asc' }, { tokenStart: 'asc' }], take: 1000 });
   res.json({ success: true, data: { total: submission._count.fingerprints, limit: 1000, items: fingerprints.map(fp => ({ ...fp, hashValue: fp.hashValue.toString() })) } });
+}));
+
+submissionRouter.post('/exams/:examId/plagiarism/scan', authenticateJwt, asyncRoute(async (req: AuthRequest, res) => {
+  const exam = await examService.getExamById(String(req.params.examId));
+  await classAccess(exam.classId, req.user!, true);
+  const result = await rblService.scanExam(exam.id);
+  res.json({ success: true, message: 'Đã hoàn thành quét và đối soát đạo văn cho đề thi.', data: result });
+}));
+
+submissionRouter.get('/exams/:examId/plagiarism/:reportId', authenticateJwt, asyncRoute(async (req: AuthRequest, res) => {
+  const exam = await examService.getExamById(String(req.params.examId));
+  await classAccess(exam.classId, req.user!, true);
+  const details = await rblService.getReportDetails(String(req.params.reportId));
+  res.json({ success: true, data: details });
+}));
+
+submissionRouter.patch('/exams/:examId/plagiarism/:reportId', authenticateJwt, asyncRoute(async (req: AuthRequest, res) => {
+  const exam = await examService.getExamById(String(req.params.examId));
+  await classAccess(exam.classId, req.user!, true);
+  const { status, lecturerNote } = req.body || {};
+  const updated = await rblService.updateReportStatus(String(req.params.reportId), status, lecturerNote);
+  res.json({ success: true, message: 'Đã cập nhật trạng thái báo cáo đạo văn.', data: updated });
+}));
+
+submissionRouter.post('/submissions/:id/ast-analyze', authenticateJwt, asyncRoute(async (req: AuthRequest, res) => {
+  const submission = await authorizedSubmission(req);
+  await rblService.analyze(submission.id);
+  res.json({ success: true, message: 'Đã hoàn tất phân tích AST cho bài nộp.' });
 }));

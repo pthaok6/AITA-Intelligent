@@ -13,6 +13,7 @@ const exam_service_1 = require("../exams/exam.service");
 const http_1 = require("../../shared/http");
 const submission_archive_1 = require("../../infrastructure/storage/submission-archive");
 const prisma_1 = require("../../infrastructure/database/prisma");
+const rbl_service_1 = require("../rbl/rbl.service");
 exports.submissionRouter = (0, express_1.Router)();
 const upload = (0, multer_1.default)({ storage: multer_1.default.memoryStorage(), limits: { fileSize: submission_archive_1.ZIP_LIMIT, files: 1, fields: 10, fieldSize: 512, parts: 20 },
     fileFilter: (_req, file, done) => /\.zip$/i.test(file.originalname) ? done(null, true) : done(new http_1.HttpError(400, 'Chỉ nhận bài nộp .zip.')) });
@@ -132,4 +133,28 @@ exports.submissionRouter.get('/submissions/:id/fingerprints', auth_middleware_1.
     const submission = await authorizedSubmission(req);
     const fingerprints = await prisma_1.prisma.aSTFingerprint.findMany({ where: { submissionId: submission.id }, orderBy: [{ sourcePath: 'asc' }, { tokenStart: 'asc' }], take: 1000 });
     res.json({ success: true, data: { total: submission._count.fingerprints, limit: 1000, items: fingerprints.map(fp => ({ ...fp, hashValue: fp.hashValue.toString() })) } });
+}));
+exports.submissionRouter.post('/exams/:examId/plagiarism/scan', auth_middleware_1.authenticateJwt, (0, http_1.asyncRoute)(async (req, res) => {
+    const exam = await exam_service_1.examService.getExamById(String(req.params.examId));
+    await (0, class_access_1.classAccess)(exam.classId, req.user, true);
+    const result = await rbl_service_1.rblService.scanExam(exam.id);
+    res.json({ success: true, message: 'Đã hoàn thành quét và đối soát đạo văn cho đề thi.', data: result });
+}));
+exports.submissionRouter.get('/exams/:examId/plagiarism/:reportId', auth_middleware_1.authenticateJwt, (0, http_1.asyncRoute)(async (req, res) => {
+    const exam = await exam_service_1.examService.getExamById(String(req.params.examId));
+    await (0, class_access_1.classAccess)(exam.classId, req.user, true);
+    const details = await rbl_service_1.rblService.getReportDetails(String(req.params.reportId));
+    res.json({ success: true, data: details });
+}));
+exports.submissionRouter.patch('/exams/:examId/plagiarism/:reportId', auth_middleware_1.authenticateJwt, (0, http_1.asyncRoute)(async (req, res) => {
+    const exam = await exam_service_1.examService.getExamById(String(req.params.examId));
+    await (0, class_access_1.classAccess)(exam.classId, req.user, true);
+    const { status, lecturerNote } = req.body || {};
+    const updated = await rbl_service_1.rblService.updateReportStatus(String(req.params.reportId), status, lecturerNote);
+    res.json({ success: true, message: 'Đã cập nhật trạng thái báo cáo đạo văn.', data: updated });
+}));
+exports.submissionRouter.post('/submissions/:id/ast-analyze', auth_middleware_1.authenticateJwt, (0, http_1.asyncRoute)(async (req, res) => {
+    const submission = await authorizedSubmission(req);
+    await rbl_service_1.rblService.analyze(submission.id);
+    res.json({ success: true, message: 'Đã hoàn tất phân tích AST cho bài nộp.' });
 }));

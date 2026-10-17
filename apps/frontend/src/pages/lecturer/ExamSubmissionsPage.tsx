@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { PlagiarismInvestigationModal } from './PlagiarismInvestigationModal';
 
 const formatDate = (value?: string) => {
   if (!value) return '-';
@@ -46,7 +47,36 @@ export const ExamSubmissionsPage: React.FC = () => {
   const [deletingTeamId, setDeletingTeamId] = useState<string | null>(null);
   const [approvingLateId, setApprovingLateId] = useState<string | null>(null);
 
+  // AST Plagiarism states
+  const [investigatingReportId, setInvestigatingReportId] = useState<string | null>(null);
+  const [scanningPlagiarism, setScanningPlagiarism] = useState(false);
+  const [plagiarismScanMessage, setPlagiarismScanMessage] = useState('');
+  const [plagiarismFilterStatus, setPlagiarismFilterStatus] = useState<string>('ALL');
+  const [plagiarismMinScore, setPlagiarismMinScore] = useState<number>(0);
+  const [plagiarismSearch, setPlagiarismSearch] = useState<string>('');
+
   const selectedExam = exams.find(exam => exam.id === selectedExamId);
+
+  const handleScanPlagiarism = async () => {
+    if (!selectedExamId) return;
+    setScanningPlagiarism(true);
+    setPlagiarismScanMessage('');
+    try {
+      const res = await apiRequest(`/exams/${selectedExamId}/plagiarism/scan`, { method: 'POST' });
+      if (res.success) {
+        setPlagiarismScanMessage(`Quét thành công: ${res.data?.totalSubmissions || 0} bài nộp, ${res.data?.reportsCount || 0} cặp đối soát (${res.data?.suspectedCount || 0} nghi vấn cao).`);
+        const reportRes = await apiRequest(`/exams/${selectedExamId}/plagiarism`);
+        if (reportRes.success && reportRes.data) setReports(reportRes.data);
+        setTimeout(() => setPlagiarismScanMessage(''), 5000);
+      } else {
+        setError(res.message || 'Quét đạo văn thất bại.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Lỗi khi quét đạo văn.');
+    } finally {
+      setScanningPlagiarism(false);
+    }
+  };
 
   const handleApproveLate = async (submissionId: string) => {
     setApprovingLateId(submissionId);
@@ -661,19 +691,252 @@ export const ExamSubmissionsPage: React.FC = () => {
               </table>
             )}
           </div>
-          <div className="card" style={{ marginTop: '1.5rem' }}>
-            <h3>Độ tương đồng AST & Winnowing</h3>
-            {!reports.length ? <p>Chưa có cặp bài hoàn tất phân tích. Báo cáo tự cập nhật sau khi worker xử lý.</p> : <table className="table">
-              <thead><tr><th>Bài A</th><th>Bài B</th><th>Tương đồng</th><th>Hash chung</th><th>Mức đánh dấu</th></tr></thead>
-              <tbody>{reports.map(report => <tr key={report.id}>
-                <td><Link to={`/student/submissions/${report.submissionAId}`}>{report.submissionA?.student?.fullName || report.submissionAId?.slice(0, 8)}</Link><div>{report.submissionAId?.slice(0, 8)}</div></td>
-                <td><Link to={`/student/submissions/${report.submissionBId}`}>{report.submissionB?.student?.fullName || report.submissionBId?.slice(0, 8)}</Link><div>{report.submissionBId?.slice(0, 8)}</div></td>
-                <td>{report.similarityScore.toFixed(2)}%</td><td>{report.matchedHashesCount}</td><td>{report.status}</td>
-              </tr>)}</tbody>
-            </table>}
+          {/* PLAGIARISM & AST MONITORING CENTER */}
+          <div className="card" style={{ marginTop: '1.5rem', border: '1px solid #334155' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <span style={{ backgroundColor: '#1e3a8a', color: '#93c5fd', padding: '0.2rem 0.6rem', borderRadius: '0.375rem', fontSize: '0.75rem', fontWeight: 700 }}>
+                    AST WINNOWING
+                  </span>
+                  <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#f8fafc' }}>Trung tâm Giám sát & Đối soát Đạo văn</h3>
+                </div>
+                <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: '0.3rem 0 0 0' }}>
+                  Đối soát cấu trúc trừu tượng (AST) và dấu vân tay mã nguồn k-gram giữa các bài nộp mới nhất của sinh viên.
+                </p>
+              </div>
+
+              <button
+                className="btn btn-primary"
+                disabled={scanningPlagiarism || submissions.length < 2}
+                onClick={handleScanPlagiarism}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}
+                title={submissions.length < 2 ? 'Cần ít nhất 2 bài nộp để đối soát đạo văn' : 'Chạy lại toàn bộ thuật toán AST Winnowing'}
+              >
+                {scanningPlagiarism ? '⏳ Đang quét...' : '🚀 Quét lại toàn bộ bài thi'}
+              </button>
+            </div>
+
+            {plagiarismScanMessage && (
+              <div style={{ padding: '0.75rem 1rem', backgroundColor: '#064e3b', border: '1px solid #059669', borderRadius: '0.5rem', color: '#a7f3d0', fontSize: '0.875rem', marginBottom: '1rem' }}>
+                ✓ {plagiarismScanMessage}
+              </div>
+            )}
+
+            {/* METRICS SUMMARY */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+              <div style={{ backgroundColor: '#0f172a', padding: '0.85rem 1rem', borderRadius: '0.5rem', border: '1px solid #1e293b' }}>
+                <div style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', fontWeight: 600 }}>Tổng cặp đối soát</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#f8fafc', marginTop: '0.2rem' }}>{reports.length}</div>
+              </div>
+
+              <div style={{ backgroundColor: '#0f172a', padding: '0.85rem 1rem', borderRadius: '0.5rem', border: '1px solid #450a0a' }}>
+                <div style={{ fontSize: '0.75rem', color: '#f87171', textTransform: 'uppercase', fontWeight: 600 }}>Nghi vấn cao (≥ 75%)</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#ef4444', marginTop: '0.2rem' }}>
+                  {reports.filter(r => r.similarityScore >= 75).length}
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: '#0f172a', padding: '0.85rem 1rem', borderRadius: '0.5rem', border: '1px solid #7f1d1d' }}>
+                <div style={{ fontSize: '0.75rem', color: '#fca5a5', textTransform: 'uppercase', fontWeight: 600 }}>Đã xác nhận (CONFIRMED)</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#f87171', marginTop: '0.2rem' }}>
+                  {reports.filter(r => r.status === 'CONFIRMED').length}
+                </div>
+              </div>
+
+              <div style={{ backgroundColor: '#0f172a', padding: '0.85rem 1rem', borderRadius: '0.5rem', border: '1px solid #064e3b' }}>
+                <div style={{ fontSize: '0.75rem', color: '#34d399', textTransform: 'uppercase', fontWeight: 600 }}>Đã bỏ qua (DISMISSED)</div>
+                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#10b981', marginTop: '0.2rem' }}>
+                  {reports.filter(r => r.status === 'DISMISSED').length}
+                </div>
+              </div>
+            </div>
+
+            {/* FILTER & SEARCH TOOLBAR */}
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '1rem', padding: '0.75rem', backgroundColor: '#0f172a', borderRadius: '0.5rem', border: '1px solid #1e293b' }}>
+              <div style={{ flex: 1, minWidth: '220px' }}>
+                <input
+                  type="text"
+                  placeholder="🔍 Tìm theo tên hoặc email sinh viên..."
+                  value={plagiarismSearch}
+                  onChange={(e) => setPlagiarismSearch(e.target.value)}
+                  style={{ width: '100%', padding: '0.45rem 0.75rem', backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '0.375rem', color: '#f8fafc', fontSize: '0.85rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Trạng thái:</span>
+                <select
+                  value={plagiarismFilterStatus}
+                  onChange={(e) => setPlagiarismFilterStatus(e.target.value)}
+                  style={{ padding: '0.45rem 0.65rem', backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '0.375rem', color: '#f8fafc', fontSize: '0.85rem' }}
+                >
+                  <option value="ALL">Tất cả trạng thái</option>
+                  <option value="SUSPECTED">Nghi vấn (SUSPECTED)</option>
+                  <option value="CONFIRMED">Đã xác nhận (CONFIRMED)</option>
+                  <option value="DISMISSED">Đã bỏ qua (DISMISSED)</option>
+                  <option value="MODERATE">Trung bình (MODERATE)</option>
+                  <option value="LOW">Mức thấp (LOW)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Độ trùng:</span>
+                <select
+                  value={plagiarismMinScore}
+                  onChange={(e) => setPlagiarismMinScore(Number(e.target.value))}
+                  style={{ padding: '0.45rem 0.65rem', backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '0.375rem', color: '#f8fafc', fontSize: '0.85rem' }}
+                >
+                  <option value={0}>Tất cả mức độ</option>
+                  <option value={50}>≥ 50% trùng lặp</option>
+                  <option value={75}>≥ 75% trùng lặp</option>
+                  <option value={90}>≥ 90% trùng lặp</option>
+                </select>
+              </div>
+            </div>
+
+            {/* TABLE */}
+            {(() => {
+              const filtered = reports.filter(r => {
+                if (plagiarismFilterStatus !== 'ALL' && r.status !== plagiarismFilterStatus) return false;
+                if (r.similarityScore < plagiarismMinScore) return false;
+                if (plagiarismSearch.trim()) {
+                  const q = plagiarismSearch.toLowerCase();
+                  const nameA = r.submissionA?.student?.fullName?.toLowerCase() || '';
+                  const emailA = r.submissionA?.student?.email?.toLowerCase() || '';
+                  const nameB = r.submissionB?.student?.fullName?.toLowerCase() || '';
+                  const emailB = r.submissionB?.student?.email?.toLowerCase() || '';
+                  if (!nameA.includes(q) && !emailA.includes(q) && !nameB.includes(q) && !emailB.includes(q)) return false;
+                }
+                return true;
+              });
+
+              if (!filtered.length) {
+                return (
+                  <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>
+                    {reports.length === 0
+                      ? 'Chưa có cặp bài nào hoàn tất phân tích AST. Bạn có thể nhấn nút "Quét lại toàn bộ bài thi" ở trên để bắt đầu.'
+                      : 'Không có cặp bài nộp nào phù hợp với bộ lọc hiện tại.'}
+                  </div>
+                );
+              }
+
+              return (
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Sinh viên A</th>
+                        <th>Sinh viên B</th>
+                        <th style={{ width: '180px' }}>Độ tương đồng</th>
+                        <th>Hash chung</th>
+                        <th>Trạng thái</th>
+                        <th>Ghi chú của GV</th>
+                        <th style={{ textAlign: 'right' }}>Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filtered.map(report => {
+                        const score = report.similarityScore;
+                        const isRed = score >= 75;
+                        const isYellow = score >= 50 && score < 75;
+                        const barColor = isRed ? '#ef4444' : isYellow ? '#f59e0b' : '#10b981';
+
+                        return (
+                          <tr key={report.id} style={{ backgroundColor: report.status === 'CONFIRMED' ? 'rgba(239, 68, 68, 0.08)' : 'transparent' }}>
+                            <td>
+                              <div style={{ fontWeight: 600, color: '#60a5fa' }}>
+                                {report.submissionA?.student?.fullName || 'Sinh viên A'}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                                {report.submissionA?.student?.email}
+                              </div>
+                            </td>
+
+                            <td>
+                              <div style={{ fontWeight: 600, color: '#f472b6' }}>
+                                {report.submissionB?.student?.fullName || 'Sinh viên B'}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                                {report.submissionB?.student?.email}
+                              </div>
+                            </td>
+
+                            <td>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <div style={{ flex: 1, height: '8px', backgroundColor: '#334155', borderRadius: '4px', overflow: 'hidden' }}>
+                                  <div style={{ width: `${Math.min(100, score)}%`, height: '100%', backgroundColor: barColor, borderRadius: '4px' }} />
+                                </div>
+                                <span style={{ fontWeight: 700, fontSize: '0.875rem', color: barColor, minWidth: '45px' }}>
+                                  {score.toFixed(1)}%
+                                </span>
+                              </div>
+                            </td>
+
+                            <td>
+                              <span style={{ fontWeight: 600 }}>{report.matchedHashesCount}</span>
+                              <span style={{ fontSize: '0.75rem', color: '#64748b' }}> k-grams</span>
+                            </td>
+
+                            <td>
+                              <span
+                                className={`badge ${
+                                  report.status === 'CONFIRMED'
+                                    ? 'badge-red'
+                                    : report.status === 'DISMISSED'
+                                    ? 'badge-green'
+                                    : report.status === 'SUSPECTED'
+                                    ? 'badge-yellow'
+                                    : 'badge-blue'
+                                }`}
+                              >
+                                {report.status === 'CONFIRMED'
+                                  ? '🚨 GIAN LẬN'
+                                  : report.status === 'DISMISSED'
+                                  ? '✓ HỢP LỆ'
+                                  : report.status === 'SUSPECTED'
+                                  ? '⚠️ NGHI VẤN'
+                                  : report.status}
+                              </span>
+                            </td>
+
+                            <td style={{ maxWidth: '200px', fontSize: '0.8rem', color: report.lecturerNote ? '#cbd5e1' : '#64748b', fontStyle: report.lecturerNote ? 'normal' : 'italic' }}>
+                              {report.lecturerNote || 'Chưa có ghi chú'}
+                            </td>
+
+                            <td style={{ textAlign: 'right' }}>
+                              <button
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => setInvestigatingReportId(report.id)}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}
+                              >
+                                🔍 So sánh chi tiết
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
+
+      {/* PLAGIARISM INVESTIGATION MODAL */}
+      {investigatingReportId && selectedExamId && (
+        <PlagiarismInvestigationModal
+          examId={selectedExamId}
+          reportId={investigatingReportId}
+          onClose={() => setInvestigatingReportId(null)}
+          onStatusUpdated={(updatedReport) => {
+            setReports(prev => prev.map(r => r.id === updatedReport.id ? { ...r, ...updatedReport } : r));
+          }}
+        />
+      )}
+
       <ConfirmDialog open={confirmDeleteExam} title="Xóa đề thi?" description={selectedExam ? `Xóa đề “${selectedExam.title}” cùng các test case và báo cáo liên quan? Chỉ đề chưa có bài nộp mới được xóa.` : ''} confirmLabel="Xóa đề" busy={deletingExam} onConfirm={deleteExam} onCancel={() => setConfirmDeleteExam(false)} />
     </div>
   );

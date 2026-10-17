@@ -8,7 +8,7 @@
     "start": "node dist/server.js",
     "dev:worker": "ts-node-dev --respawn --transpile-only src/worker.ts",
     "start:worker": "node dist/worker.js",
-    "test": "npm run build && node --test tests/unit.test.cjs tests/rbl-unit.test.cjs tests/appeal.test.cjs tests/group-exam-git.test.cjs tests/ai.test.cjs",
+    "test": "npm run build && node --test tests/unit.test.cjs tests/ast-plagiarism.test.cjs tests/appeal.test.cjs tests/group-exam-git.test.cjs tests/ai.test.cjs",
     "test:sandbox": "npm run build && node --test --test-concurrency=1 tests/docker.test.cjs tests/sandbox-integration.test.cjs",
     "test:db:setup": "node scripts/setup-test-db.cjs",
     "seed:demo": "node scripts/seed-test-accounts.cjs",
