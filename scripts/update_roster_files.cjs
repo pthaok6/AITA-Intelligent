@@ -5,11 +5,11 @@ const path = require('path');
 async function updateFiles() {
   const root = path.resolve(__dirname, '..');
   const students = [
-    { stt: 1, code: 'SE170001', name: 'Nguyễn Văn Nam (Trưởng nhóm)', email: 'student.test@fpt.edu.vn' },
-    { stt: 2, code: 'SE170002', name: 'Trần Thị Minh Anh (Thành viên)', email: 'student.test02@fpt.edu.vn' },
-    { stt: 3, code: 'SE170003', name: 'Lê Hoàng Long (Thành viên Tester)', email: 'student.test03@fpt.edu.vn' },
-    { stt: 4, code: 'SE170004', name: 'Phạm Đức Lười (Cảnh báo Free-rider BR-05)', email: 'student.test04@fpt.edu.vn' },
-    { stt: 5, code: 'SE170005', name: 'Hoàng Minh Đức (Thành viên 05)', email: 'student.test05@fpt.edu.vn' },
+    { stt: 1, code: 'SE170001', name: 'Nguyễn Văn Nam', email: 'student.test@fpt.edu.vn' },
+    { stt: 2, code: 'SE170002', name: 'Trần Thị Minh Anh', email: 'student.test02@fpt.edu.vn' },
+    { stt: 3, code: 'SE170003', name: 'Lê Hoàng Long', email: 'student.test03@fpt.edu.vn' },
+    { stt: 4, code: 'SE170004', name: 'Phạm Đức Nam', email: 'student.test04@fpt.edu.vn' },
+    { stt: 5, code: 'SE170005', name: 'Hoàng Minh Đức', email: 'student.test05@fpt.edu.vn' },
     { stt: 6, code: 'SE170101', name: 'Đỗ Quang Huy', email: 'huydqse170101@fpt.edu.vn' },
     { stt: 7, code: 'SE170102', name: 'Phạm Minh Tuấn', email: 'tuanpmse170102@fpt.edu.vn' },
     { stt: 8, code: 'SE170103', name: 'Vũ Thị Mai', email: 'maivtse170103@fpt.edu.vn' },
