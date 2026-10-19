@@ -41,11 +41,20 @@ call npm.cmd run db:setup
 if errorlevel 1 goto failed
 
 echo.
-echo [3/3] Dang mo Prisma Studio tai http://localhost:5555...
+echo [3/5] Dang kiem tra Sandbox Runner (Python)...
+docker image inspect aita-runner-python:1 >nul 2>&1
+if errorlevel 1 (
+  echo Dang build Docker Runner cho Python (aita-runner-python:1)...
+  docker compose --profile runners build runner-python
+  if errorlevel 1 goto failed
+)
+
+echo.
+echo [4/5] Dang mo Prisma Studio tai http://localhost:5555...
 start "Prisma Studio" cmd /k "npm.cmd run db:studio"
 
 echo.
-echo [4/4] Dang khoi dong API, worker va frontend...
+echo [5/5] Dang khoi dong API, worker va frontend...
 echo Frontend: http://localhost:5173
 echo API:      http://localhost:5000/api/health
 echo Prisma:   http://localhost:5555
