@@ -41,13 +41,13 @@ call npm.cmd run db:setup
 if errorlevel 1 goto failed
 
 echo.
-echo [3/5] Dang kiem tra Sandbox Runner (Python)...
+echo [3/5] Dang kiem tra Sandbox Runner Python...
 docker image inspect aita-runner-python:1 >nul 2>&1
 if errorlevel 1 (
-  echo Dang build Docker Runner cho Python (aita-runner-python:1)...
+  echo Dang build Docker Runner cho Python...
   docker compose --profile runners build runner-python
-  if errorlevel 1 goto failed
 )
+if errorlevel 1 goto failed
 
 echo.
 echo [4/5] Dang mo Prisma Studio tai http://localhost:5555...
