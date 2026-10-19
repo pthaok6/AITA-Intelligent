@@ -113,7 +113,11 @@ function selectBundle(files, language, requested) {
     let entrypoint = '';
     if (language === 'PYTHON') {
         const mains = sources.filter(f => path_1.default.posix.basename(f.path) === 'main.py');
-        entrypoint = requested || (mains.length === 1 ? mains[0].path : sources.length === 1 ? sources[0].path : '');
+        const requestedPath = requested?.replace(/^\/+/, '').replace(/\\/g, '/');
+        const matchedRequest = requestedPath
+            ? sources.find(f => f.path === requestedPath || f.path.endsWith('/' + requestedPath))
+            : undefined;
+        entrypoint = matchedRequest?.path || requestedPath || (mains.length === 1 ? mains[0].path : sources.length === 1 ? sources[0].path : '');
         if (!sources.some(f => f.path === entrypoint))
             throw new http_1.HttpError(400, 'Chọn đường dẫn file Python chạy chính trong ZIP (ví dụ main.py).');
         safeZipPath(entrypoint);

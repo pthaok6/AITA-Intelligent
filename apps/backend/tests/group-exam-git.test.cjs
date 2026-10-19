@@ -288,13 +288,11 @@ test('GROUP EXAM & GIT ANALYTICS SUITE', async (t) => {
       assert.equal(lateSub.status, SubmissionStatus.LATE, 'Late submission must have status LATE');
       assert.equal(lateSub.isLate, true, 'isLate must be true');
 
-      // Duplicate SHA-256 submission detection (BR-07)
-      await assert.rejects(
-        async () => {
-          await submissionService.submitArchive(tempExam.id, students[1].id, zipContent, 'solution.zip', entrypoint, validRepo);
-        },
-        /BR-07: Trùng mã băm SHA-256/
-      );
+      // Identical source is allowed as a new submission attempt.
+      const repeatedSubmission = await submissionService.submitArchive(tempExam.id, students[1].id, zipContent, 'solution.zip', entrypoint, validRepo);
+      assert.equal(repeatedSubmission.status, SubmissionStatus.LATE);
+      assert.notEqual(repeatedSubmission.id, lateSub.id);
+      assert.equal(repeatedSubmission.fileHashSha256, lateSub.fileHashSha256);
 
       // Commit SHA verification
       submissionService.verifyGitHubCommit = async (repo, sha) => {
@@ -317,6 +315,40 @@ test('GROUP EXAM & GIT ANALYTICS SUITE', async (t) => {
       // Valid commit SHA -> Accepted and stored
       const subWithValidSha = await submissionService.submitArchive(tempExam.id, students[1].id, zipCommitContent, 'solution2.zip', entrypoint, validRepo, 'a1b2c3d4e5f');
       assert.equal(subWithValidSha.commitSha, 'a1b2c3d4e5f');
+
+      // Direct Git submission uses the latest default-branch commit, stores the source archive,
+      // and updates the group's registered repository for lecturer views.
+      const nextRepo = 'https://github.com/aita-test/submission-source-repo';
+      const nextCommitSha = 'c'.repeat(40);
+      const githubArchive = new JSZip();
+      githubArchive.file('submission-source-repo-' + nextCommitSha.slice(0, 7) + '/main.py', 'print("from current Git commit")');
+      const githubArchiveBytes = await githubArchive.generateAsync({ type: 'nodebuffer' });
+      const originalFetch = global.fetch;
+      const originalVerifyZip = submissionService.verifyZipAgainstRepo;
+      global.fetch = async input => {
+        const url = String(input);
+        if (url.includes('/commits?per_page=1')) {
+          return new Response(JSON.stringify([{ sha: nextCommitSha }]), { status: 200, headers: { 'content-type': 'application/json' } });
+        }
+        if (url.endsWith('/zipball/' + nextCommitSha)) return new Response(githubArchiveBytes, { status: 200 });
+        throw new Error('Unexpected GitHub URL: ' + url);
+      };
+      submissionService.verifyZipAgainstRepo = async () => ({
+        status: 'VERIFIED', matchPercent: 100, matchedFiles: 1, totalFiles: 1, details: [], message: 'Verified test archive',
+      });
+      try {
+        const gitSubmission = await submissionService.submitFromGitHub(tempExam.id, students[1].id, nextRepo, entrypoint);
+        assert.equal(gitSubmission.commitSha, nextCommitSha);
+        assert.equal(gitSubmission.teamRepoUrl, nextRepo);
+        assert.equal(gitSubmission.status, SubmissionStatus.LATE);
+        const updatedTeamRepo = await teamService.getTeamById(team.id);
+        assert.equal(updatedTeamRepo.repoUrl, nextRepo);
+        const updateAudits = await prisma.auditLog.findMany({ where: { entityType: 'TEAM', entityId: team.id, action: 'UPDATE_REPO' } });
+        assert.ok(updateAudits.some(audit => audit.newValue === nextRepo), 'Submission repository update should be audited');
+      } finally {
+        global.fetch = originalFetch;
+        submissionService.verifyZipAgainstRepo = originalVerifyZip;
+      }
 
       // Lecturer approves late submission (BR-02)
       const approvedSub = await submissionService.approveLateSubmission(lateSub.id, lecturer.id);
