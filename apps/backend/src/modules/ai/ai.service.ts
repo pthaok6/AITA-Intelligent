@@ -8,7 +8,8 @@ import {
   ErrorExplanationResult,
   CleanCodeReviewResult,
 } from '../../infrastructure/ai/ai.interface';
-import { loadBundle } from '../../infrastructure/storage/submission-archive';
+import fs from 'fs/promises';
+import { loadBundle, readZip, archivePath } from '../../infrastructure/storage/submission-archive';
 import { HttpError } from '../../shared/http';
 
 export class AiModuleService {
@@ -67,7 +68,19 @@ export class AiModuleService {
           content: f.data.toString('utf-8'),
         }));
       } catch (err: any) {
-        console.warn(`[AI Review] Không thể giải nén bundle của submission ${submissionId}:`, err.message);
+        console.warn(`[AI Review] loadBundle error: ${err.message}. Thử giải nén trực tiếp tệp mã nguồn từ ZIP...`);
+        try {
+          const bytes = await fs.readFile(archivePath(submission.sourceCodeUrl));
+          const unzipped = await readZip(bytes);
+          const ext = ({ PYTHON: '.py', CSHARP: '.cs', JAVA: '.java' } as Record<string, string>)[submission.exam.allowedLanguage];
+          const matchedFiles = ext ? unzipped.filter(f => f.path.endsWith(ext) && !f.path.includes('__MACOSX')) : unzipped;
+          files = (matchedFiles.length ? matchedFiles : unzipped).map(f => ({
+            path: f.path,
+            content: f.data.toString('utf-8'),
+          }));
+        } catch (zipErr: any) {
+          console.warn(`[AI Review] Không thể giải nén bundle của submission ${submissionId}:`, zipErr.message);
+        }
       }
     }
 

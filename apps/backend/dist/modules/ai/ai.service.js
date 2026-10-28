@@ -1,8 +1,12 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.aiModuleService = exports.AiModuleService = void 0;
 const prisma_1 = require("../../infrastructure/database/prisma");
 const ai_service_1 = require("../../infrastructure/ai/ai.service");
+const promises_1 = __importDefault(require("fs/promises"));
 const submission_archive_1 = require("../../infrastructure/storage/submission-archive");
 const http_1 = require("../../shared/http");
 class AiModuleService {
@@ -54,7 +58,20 @@ class AiModuleService {
                 }));
             }
             catch (err) {
-                console.warn(`[AI Review] Không thể giải nén bundle của submission ${submissionId}:`, err.message);
+                console.warn(`[AI Review] loadBundle error: ${err.message}. Thử giải nén trực tiếp tệp mã nguồn từ ZIP...`);
+                try {
+                    const bytes = await promises_1.default.readFile((0, submission_archive_1.archivePath)(submission.sourceCodeUrl));
+                    const unzipped = await (0, submission_archive_1.readZip)(bytes);
+                    const ext = { PYTHON: '.py', CSHARP: '.cs', JAVA: '.java' }[submission.exam.allowedLanguage];
+                    const matchedFiles = ext ? unzipped.filter(f => f.path.endsWith(ext) && !f.path.includes('__MACOSX')) : unzipped;
+                    files = (matchedFiles.length ? matchedFiles : unzipped).map(f => ({
+                        path: f.path,
+                        content: f.data.toString('utf-8'),
+                    }));
+                }
+                catch (zipErr) {
+                    console.warn(`[AI Review] Không thể giải nén bundle của submission ${submissionId}:`, zipErr.message);
+                }
             }
         }
         // Run Semantic Clean Code review

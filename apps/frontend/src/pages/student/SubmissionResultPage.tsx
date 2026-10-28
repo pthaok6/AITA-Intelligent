@@ -233,14 +233,18 @@ export const SubmissionResultPage: React.FC = () => {
             </Link>
           )}
         </div>
-        {submission.scoreReleased && (
+        {!waiting && (
           <button
             type="button"
             className="btn btn-secondary btn-sm ai-review-button"
             disabled={triggeringAiReview}
             onClick={handleTriggerAiReview}
           >
-            {triggeringAiReview ? ' Đang phân tích mã nguồn...' : ' Yêu cầu AI Review lại mã nguồn'}
+            {triggeringAiReview
+              ? '⏳ Đang phân tích mã nguồn...'
+              : latestAiReview
+              ? '🔄 Yêu cầu AI Review lại mã nguồn'
+              : '✨ Yêu cầu AI Review mã nguồn'}
           </button>
         )}
       </div>
@@ -435,7 +439,7 @@ export const SubmissionResultPage: React.FC = () => {
       )}
 
       {/* CARD 3: SEMANTIC CODE REVIEW & CLEAN CODE SCORING */}
-      {(submission.scoreReleased || user?.role !== 'STUDENT') && latestAiReview && (
+      {latestAiReview && (
         <div className="clean-code-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid rgba(59, 130, 246, 0.25)', paddingBottom: '1rem' }}>
             <div>
@@ -474,6 +478,24 @@ export const SubmissionResultPage: React.FC = () => {
               <MarkdownPreview content={latestAiReview.suggestions} />
             </div>
           </div>
+        </div>
+      )}
+
+      {/* When no AI Review yet and submission finished */}
+      {!latestAiReview && !waiting && submission.status !== 'FAILED' && (
+        <div className="card" style={{ marginTop: '1rem', background: 'rgba(30, 41, 59, 0.4)', border: '1px dashed #475569', textAlign: 'center', padding: '1.5rem' }}>
+          <h4 style={{ color: '#93c5fd', margin: '0 0 0.5rem' }}>✨ Đánh giá Clean Code & Nguyên lý SOLID</h4>
+          <p style={{ color: '#94a3b8', fontSize: '0.9rem', margin: '0 0 1rem' }}>
+            Bài nộp này chưa có kết quả đánh giá Clean Code tự động hoặc đang trong hàng đợi xử lý.
+          </p>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            disabled={triggeringAiReview}
+            onClick={handleTriggerAiReview}
+          >
+            {triggeringAiReview ? '⏳ Đang phân tích mã nguồn...' : '✨ Yêu cầu AI Review ngay'}
+          </button>
         </div>
       )}
 

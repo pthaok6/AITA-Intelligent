@@ -451,6 +451,10 @@ class AppealService {
         });
         if (!appeal)
             throw new http_1.HttpError(404, 'Không tìm thấy khiếu nại.');
+        // An appeal that has already been ACCEPTED or REJECTED cannot be modified again
+        if (['ACCEPTED', 'REJECTED'].includes(appeal.status)) {
+            throw new http_1.HttpError(400, 'Đơn khiếu nại này đã có quyết định giải quyết chính thức, không thể sửa đổi kết quả nữa.');
+        }
         // Permission enforcement:
         // Round 2 (Khảo thí / Admin) MUST only be resolved by ADMIN.
         if (appeal.round === 2 || appeal.targetRole === 'ADMIN') {
@@ -474,8 +478,8 @@ class AppealService {
             });
         }
         if (input.status === 'ACCEPTED') {
-            if (typeof input.newScore !== 'number' || isNaN(input.newScore) || input.newScore < 0) {
-                throw new http_1.HttpError(400, 'Vui lòng nhập điểm mới hợp lệ (số không âm).');
+            if (typeof input.newScore !== 'number' || isNaN(input.newScore) || input.newScore < 0 || input.newScore > 100) {
+                throw new http_1.HttpError(400, 'Vui lòng nhập điểm mới hợp lệ (từ 0 đến 100).');
             }
             if (!input.decisionReason || input.decisionReason.trim().length === 0) {
                 throw new http_1.HttpError(400, 'Vui lòng cung cấp lý do chấp thuận hoặc nhận xét cho sinh viên.');

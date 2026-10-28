@@ -50,8 +50,9 @@ export class GeminiProvider implements IAiProvider {
     const candidates = [
       this.preferredModel,
       'gemini-3.5-flash-lite',
-      'gemini-3.1-flash-lite',
+      'gemini-2.5-flash',
       'gemini-3.5-flash',
+      'gemini-flash-latest',
       'gemma-4-26b-a4b-it'
     ];
     this.fallbackModels = candidates.filter((m, idx, arr) => arr.indexOf(m) === idx);
@@ -62,12 +63,12 @@ export class GeminiProvider implements IAiProvider {
   }
 
   private async callGemini(prompt: string, systemInstruction?: string): Promise<{ text: string; tokensUsed: number }> {
-    const key = keyPool.getGeminiKey();
-    if (!key) throw new Error('Không có Gemini API Key khả dụng.');
-
     let lastError: Error | null = null;
 
     for (const modelName of this.fallbackModels) {
+      const key = keyPool.getGeminiKey();
+      if (!key) break;
+
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
       const payload: any = {
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
@@ -92,14 +93,14 @@ export class GeminiProvider implements IAiProvider {
 
         if (!response.ok) {
           const errorText = await response.text();
-          // If 503 (high demand) or 404 (model deprecated/unavailable), auto-fallback to next model
-          if (response.status === 503 || response.status === 404) {
+          if (response.status === 429) {
+            keyPool.markGeminiKeyFailed(key, true);
+          }
+          // If 503 (high demand), 429 (rate limit), 404 (deprecated), or 5xx (Google server error), auto-fallback to next model
+          if ([404, 429, 500, 502, 503, 504].includes(response.status)) {
             console.warn(`[GeminiProvider] Model ${modelName} returned HTTP ${response.status}. Thử model dự phòng tiếp theo...`);
             lastError = new Error(`Gemini API Error (${response.status}): ${errorText.slice(0, 300)}`);
             continue;
-          }
-          if (response.status === 429) {
-            keyPool.markGeminiKeyFailed(key, true);
           }
           throw new Error(`Gemini API Error (${response.status}): ${errorText.slice(0, 300)}`);
         }
@@ -113,7 +114,7 @@ export class GeminiProvider implements IAiProvider {
         return { text, tokensUsed };
       } catch (err: any) {
         lastError = err;
-        if (err.message?.includes('503') || err.message?.includes('404')) {
+        if (/500|502|503|504|404|429/.test(err.message || '')) {
           continue;
         }
         throw err;

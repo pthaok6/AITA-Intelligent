@@ -80,10 +80,19 @@ aiRouter.post(
       throw new HttpError(404, 'Không tìm thấy bài nộp.');
     }
 
-    // Permission check: Sinh viên là chủ bài nộp hoặc giảng viên của lớp
+    // Permission check: Sinh viên là chủ bài nộp hoặc thành viên nhóm hoặc giảng viên của lớp
     if (req.user!.role === UserRole.STUDENT) {
       if (submission.studentId !== req.user!.userId) {
-        throw new HttpError(403, 'Bạn không có quyền yêu cầu review cho bài nộp của người khác.');
+        if (submission.teamId) {
+          const membership = await prisma.teamMember.findUnique({
+            where: { teamId_studentId: { teamId: submission.teamId, studentId: req.user!.userId } },
+          });
+          if (!membership) {
+            throw new HttpError(403, 'Bạn không có quyền yêu cầu review cho bài nộp của nhóm khác.');
+          }
+        } else {
+          throw new HttpError(403, 'Bạn không có quyền yêu cầu review cho bài nộp của người khác.');
+        }
       }
     } else {
       await classAccess(submission.exam.classId, req.user!, true);
@@ -110,13 +119,16 @@ aiRouter.get(
 
     if (req.user!.role === UserRole.STUDENT) {
       if (submission.studentId !== req.user!.userId) {
-        throw new HttpError(403, 'Không có quyền truy cập bài nộp này.');
-      }
-      // Check if scores are released
-      const scoreReleased = new Date() >= submission.exam.endTime;
-      if (!scoreReleased) {
-        res.json({ success: true, data: [] });
-        return;
+        if (submission.teamId) {
+          const membership = await prisma.teamMember.findUnique({
+            where: { teamId_studentId: { teamId: submission.teamId, studentId: req.user!.userId } },
+          });
+          if (!membership) {
+            throw new HttpError(403, 'Không có quyền truy cập bài nộp này.');
+          }
+        } else {
+          throw new HttpError(403, 'Không có quyền truy cập bài nộp này.');
+        }
       }
     } else {
       await classAccess(submission.exam.classId, req.user!, true);
@@ -127,6 +139,8 @@ aiRouter.get(
   })
 );
 
+import { keyPool } from '../../infrastructure/ai/key-pool';
+
 // Kiểm tra trạng thái hệ thống AI và Key Pool
 aiRouter.get(
   '/config-status',
@@ -135,3 +149,60 @@ aiRouter.get(
     res.json({ success: true, data: aiModuleService.getStatus() });
   })
 );
+
+// UC14 — Manage AI API Key Rotation (Admin endpoints)
+aiRouter.get(
+  '/admin/keys',
+  authenticateJwt,
+  requireRoles(UserRole.ADMIN),
+  asyncRoute(async (_req: AuthRequest, res: Response) => {
+    res.json({ success: true, data: keyPool.listKeys() });
+  })
+);
+
+aiRouter.post(
+  '/admin/keys',
+  authenticateJwt,
+  requireRoles(UserRole.ADMIN),
+  asyncRoute(async (req: AuthRequest, res: Response) => {
+    const { provider, key, probeFirst } = req.body || {};
+    if (!provider || !['gemini', 'openai'].includes(provider)) {
+      throw new HttpError(400, 'Nhà cung cấp AI không hợp lệ (hỗ trợ gemini hoặc openai).');
+    }
+    const entry = await keyPool.addCustomKey(provider, key, probeFirst !== false);
+    res.status(201).json({ success: true, data: entry, message: 'Thêm Key vào Pool thành công.' });
+  })
+);
+
+aiRouter.delete(
+  '/admin/keys/:id',
+  authenticateJwt,
+  requireRoles(UserRole.ADMIN),
+  asyncRoute(async (req: AuthRequest, res: Response) => {
+    const ok = keyPool.removeKey(String(req.params.id));
+    if (!ok) throw new HttpError(404, 'Không tìm thấy Key cần xóa.');
+    res.json({ success: true, message: 'Đã xóa Key khỏi Pool.' });
+  })
+);
+
+aiRouter.post(
+  '/admin/keys/:id/reset',
+  authenticateJwt,
+  requireRoles(UserRole.ADMIN),
+  asyncRoute(async (req: AuthRequest, res: Response) => {
+    const ok = keyPool.resetKey(String(req.params.id));
+    if (!ok) throw new HttpError(404, 'Không tìm thấy Key cần reset.');
+    res.json({ success: true, message: 'Đã reset cooldown cho Key.' });
+  })
+);
+
+aiRouter.post(
+  '/admin/keys/:id/probe',
+  authenticateJwt,
+  requireRoles(UserRole.ADMIN),
+  asyncRoute(async (req: AuthRequest, res: Response) => {
+    const probe = await keyPool.probeKey(String(req.params.id));
+    res.json({ success: true, data: probe });
+  })
+);
+

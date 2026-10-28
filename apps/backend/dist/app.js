@@ -18,6 +18,7 @@ const admin_controller_1 = require("./modules/auth/admin.controller");
 const team_controller_1 = require("./modules/teams/team.controller");
 const appeal_controller_1 = require("./modules/appeals/appeal.controller");
 const ai_controller_1 = require("./modules/ai/ai.controller");
+const notification_controller_1 = require("./modules/notifications/notification.controller");
 exports.app = (0, express_1.default)();
 exports.app.use((0, cors_1.default)({ credentials: true, origin: (origin, callback) => {
         if (!origin || (0, config_1.allowedOrigins)().includes(origin))
@@ -45,6 +46,7 @@ exports.app.use('/api', team_controller_1.teamRouter);
 exports.app.use('/api', submission_controller_1.submissionRouter);
 exports.app.use('/api/appeals', appeal_controller_1.appealRouter);
 exports.app.use('/api/ai', ai_controller_1.aiRouter);
+exports.app.use('/api/notifications', notification_controller_1.notificationRouter);
 exports.app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'ok', service: 'AITA Backend API', time: new Date().toISOString() });
 });

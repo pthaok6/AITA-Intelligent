@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { apiRequest } from '../api/client';
 
-export interface User { id: string; email: string; fullName: string; role: 'ADMIN' | 'LECTURER' | 'STUDENT' }
+export interface User { id: string; email: string; fullName: string; role: 'ADMIN' | 'LECTURER' | 'STUDENT'; avatarUrl?: string | null }
 interface AuthContextType {
   user: User | null; token: string | null; loading: boolean;
   login: (token: string, user: User) => void;
   logout: () => Promise<boolean>;
+  updateUser: (updated: Partial<User>) => void;
   isAuthenticated: boolean;
 }
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -54,13 +55,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
   const login = useCallback((newToken: string, newUser: User) => { setToken(newToken); setUser(newUser); }, []);
+  const updateUser = useCallback((updated: Partial<User>) => { setUser(prev => prev ? { ...prev, ...updated } : null); }, []);
   const logout = async () => {
     const result = await apiRequest('/auth/logout', { method: 'POST' });
     if (!result.success) return false;
     setUser(null); setToken(null);
     return true;
   };
-  return <AuthContext.Provider value={{ user, token, loading, login, logout, isAuthenticated: !!user }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, token, loading, login, logout, updateUser, isAuthenticated: !!user }}>{children}</AuthContext.Provider>;
 };
 export const useAuth = () => {
   const context = useContext(AuthContext);

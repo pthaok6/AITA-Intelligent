@@ -31,7 +31,7 @@ export async function apiRequest<T = any>(endpoint: string, options: RequestInit
   if (options.body && !(options.body instanceof FormData)) headers.set('Content-Type', 'application/json');
 
   const controller = new AbortController();
-  const isAiReview = endpoint.startsWith('/ai/review-submission/');
+  const isAiReview = endpoint.startsWith('/ai/');
   const timeoutMs = isAiReview ? 120000 : options.body instanceof FormData ? 60000 : 15000;
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 

@@ -44,7 +44,15 @@ exports.authRouter.post('/logout', (0, http_1.asyncRoute)(async (req, res) => {
     res.json({ success: true });
 }));
 exports.authRouter.get('/me', auth_middleware_1.authenticateJwt, (0, http_1.asyncRoute)(async (req, res) => {
-    const user = await prisma_1.prisma.user.findUniqueOrThrow({ where: { id: req.user.userId }, select: { id: true, email: true, role: true, fullName: true } });
+    const user = await prisma_1.prisma.user.findUniqueOrThrow({ where: { id: req.user.userId }, select: { id: true, email: true, role: true, fullName: true, avatarUrl: true } });
     res.setHeader('Cache-Control', 'no-store');
     res.json({ success: true, data: user });
+}));
+exports.authRouter.get('/profile', auth_middleware_1.authenticateJwt, (0, http_1.asyncRoute)(async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ success: true, data: await auth_service_1.authService.getProfile(req.user.userId) });
+}));
+exports.authRouter.patch('/profile', auth_middleware_1.authenticateJwt, (0, http_1.asyncRoute)(async (req, res) => {
+    const updated = await auth_service_1.authService.updateProfile(req.user.userId, req.body || {});
+    res.json({ success: true, data: updated, message: 'Cập nhật hồ sơ thành công.' });
 }));
