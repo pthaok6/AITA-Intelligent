@@ -34,7 +34,7 @@ appealRouter.get('/lecturer', authenticateJwt, asyncRoute(async (req: AuthReques
   if (req.user!.role === 'STUDENT') {
     throw new HttpError(403, 'Hộp thư giải quyết khiếu nại chỉ dành cho Giảng viên và Quản trị viên.');
   }
-  const { status, classId, examId } = req.query;
+  const { status, classId, examId, round, targetRole } = req.query;
   const appeals = await appealService.getLecturerAppeals(
     req.user!.userId,
     req.user!.role,
@@ -42,6 +42,8 @@ appealRouter.get('/lecturer', authenticateJwt, asyncRoute(async (req: AuthReques
       status: status ? String(status) : undefined,
       classId: classId ? String(classId) : undefined,
       examId: examId ? String(examId) : undefined,
+      round: round ? Number(round) : undefined,
+      targetRole: targetRole ? String(targetRole) : undefined,
     }
   );
   res.json({ success: true, data: appeals });

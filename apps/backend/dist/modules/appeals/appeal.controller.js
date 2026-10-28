@@ -32,11 +32,13 @@ exports.appealRouter.get('/lecturer', auth_middleware_1.authenticateJwt, (0, htt
     if (req.user.role === 'STUDENT') {
         throw new http_1.HttpError(403, 'Hộp thư giải quyết khiếu nại chỉ dành cho Giảng viên và Quản trị viên.');
     }
-    const { status, classId, examId } = req.query;
+    const { status, classId, examId, round, targetRole } = req.query;
     const appeals = await appeal_service_1.appealService.getLecturerAppeals(req.user.userId, req.user.role, {
         status: status ? String(status) : undefined,
         classId: classId ? String(classId) : undefined,
         examId: examId ? String(examId) : undefined,
+        round: round ? Number(round) : undefined,
+        targetRole: targetRole ? String(targetRole) : undefined,
     });
     res.json({ success: true, data: appeals });
 }));

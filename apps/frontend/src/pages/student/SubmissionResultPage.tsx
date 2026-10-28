@@ -141,7 +141,12 @@ export const SubmissionResultPage: React.FC = () => {
   };
 
   const handleOpenAppealModal = () => {
-    setAppealTitle(`Khiếu nại kết quả chấm - ${submission?.exam?.title || ''}`);
+    const roundNumber = appeals.length + 1;
+    if (roundNumber === 1) {
+      setAppealTitle(`Phúc khảo Lần 1 (Gửi Giảng viên) - ${submission?.exam?.title || ''}`);
+    } else {
+      setAppealTitle(`Phúc khảo Lần 2 (Gửi Khảo thí) - ${submission?.exam?.title || ''}`);
+    }
     setAppealReason('');
     setAppealExpectedScore('');
     setAppealError('');
@@ -155,6 +160,7 @@ export const SubmissionResultPage: React.FC = () => {
       setAppealError('Vui lòng nhập lý do khiếu nại cụ thể.');
       return;
     }
+    const roundNumber = appeals.length + 1;
     setSubmittingAppeal(true);
     setAppealError('');
 
@@ -170,7 +176,11 @@ export const SubmissionResultPage: React.FC = () => {
 
     setSubmittingAppeal(false);
     if (res.success) {
-      setAppealSuccess('Đã gửi đơn khiếu nại thành công! Giảng viên phụ trách sẽ xem xét và phản hồi.');
+      setAppealSuccess(
+        roundNumber === 1
+          ? 'Đã gửi đơn khiếu nại Lần 1 thành công! Giảng viên phụ trách sẽ xem xét và phản hồi.'
+          : 'Đã gửi đơn khiếu nại Lần 2 thành công! Ban Khảo thí (Admin) sẽ thẩm định độc lập và đưa ra kết quả cuối cùng.'
+      );
       setShowAppealModal(false);
       void fetchAppeals();
     } else {
@@ -523,49 +533,166 @@ export const SubmissionResultPage: React.FC = () => {
         </div>
       )}
 
-      {/* CARD 5: GRADE APPEAL SECTION FOR STUDENT */}
+      {/* CARD 5: GRADE APPEAL SECTION FOR STUDENT (2-TIER WORKFLOW) */}
       {submission.scoreReleased && isStudent && (
         <div className="card" style={{ marginTop: '1rem', borderLeft: '4px solid #3b82f6' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
             <div>
-              <h3 style={{ fontSize: '1.1rem', marginBottom: '0.25rem' }}>Khiếu nại điểm bài thi</h3>
-              <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
-                Nếu bạn nhận thấy kết quả chấm có sai sót hoặc cần thẩm định lại, bạn có thể tạo đơn khiếu nại gửi tới giảng viên phụ trách.
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                <h3 style={{ fontSize: '1.1rem', margin: 0 }}>Phúc khảo & Khiếu nại điểm số (Quy trình 2 Cấp)</h3>
+                <span className="badge badge-blue" style={{ fontSize: '0.75rem' }}>
+                  {appeals.length}/2 lượt khiếu nại
+                </span>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: '#94a3b8', margin: 0 }}>
+                Hệ thống hỗ trợ 2 lần phúc khảo độc lập: <strong>Lần 1</strong> gửi Giảng viên phụ trách lớp; <strong>Lần 2</strong> gửi Ban Khảo thí (Admin) để so sánh đối chiếu minh bạch và công bằng.
               </p>
             </div>
             <div>
-              {!hasActiveAppeal ? (
+              {appeals.length === 0 && (
                 <button onClick={handleOpenAppealModal} className="btn btn-primary btn-sm">
-                   Gửi khiếu nại điểm
+                  Gửi khiếu nại Lần 1 (Giảng viên)
                 </button>
-              ) : (
-                <span className="badge badge-yellow">Đã có khiếu nại đang chờ xử lý</span>
+              )}
+              {appeals.length === 1 && !['ACCEPTED', 'REJECTED'].includes(appeals[0].status) && (
+                <span className="badge badge-yellow">Đang chờ Giảng viên xử lý Lần 1</span>
+              )}
+              {appeals.length === 1 && ['ACCEPTED', 'REJECTED'].includes(appeals[0].status) && (
+                <button onClick={handleOpenAppealModal} className="btn btn-warning btn-sm" style={{ background: '#f59e0b', color: '#000', fontWeight: 600 }}>
+                  Gửi khiếu nại Lần 2 (Khảo thí)
+                </button>
+              )}
+              {appeals.length >= 2 && !['ACCEPTED', 'REJECTED'].includes(appeals[1]?.status) && (
+                <span className="badge badge-yellow">Đang chờ Ban Khảo thí xử lý Lần 2</span>
+              )}
+              {appeals.length >= 2 && ['ACCEPTED', 'REJECTED'].includes(appeals[1]?.status) && (
+                <span className="badge badge-green">Đã hoàn thành 2 lần phúc khảo (Giảng viên & Khảo thí)</span>
               )}
             </div>
           </div>
 
+          {/* Banner notification for Round 2 opportunity */}
+          {appeals.length === 1 && ['ACCEPTED', 'REJECTED'].includes(appeals[0].status) && (
+            <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.3)', borderRadius: '0.5rem', fontSize: '0.875rem', color: '#fde68a' }}>
+              <strong>Thông báo lượt 2:</strong> Bạn đã hoàn tất phúc khảo Lần 1 với Giảng viên. Nếu nhận thấy điểm số vẫn chưa thỏa đáng hoặc cần thẩm định độc lập, bạn có quyền gửi khiếu nại <strong>Lần 2 lên Ban Khảo thí (Admin)</strong> để so sánh kết quả giữa 2 người (Tối đa 2 lần/bài nộp).
+            </div>
+          )}
+
+          {/* TRANSPARENT 3-TIER SCORE COMPARISON */}
           {appeals.length > 0 && (
-            <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '0.75rem' }}>
-              <h4 style={{ fontSize: '0.95rem', marginBottom: '0.5rem', color: '#e2e8f0' }}>Lịch sử khiếu nại của bài này:</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {appeals.map((app) => (
-                  <div key={app.id} style={{ background: '#090d16', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)' }}>
-                    <div className="appeal-history-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <strong style={{ fontSize: '0.95rem' }}>{app.title}</strong>
-                      {getStatusBadge(app.status)}
+            <div style={{ marginTop: '1.25rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <h4 style={{ fontSize: '0.95rem', margin: 0, color: '#e2e8f0' }}>Bảng đối chiếu minh bạch điểm số các cấp:</h4>
+                <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                  Điểm chốt hiện tại: <strong style={{ color: '#38bdf8', fontSize: '1rem' }}>{submission.totalScore} điểm</strong>
+                </span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.75rem' }}>
+                {/* Tier 1: Điểm AI Ban Đầu */}
+                <div style={{ background: '#090d16', padding: '0.85rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>1. Điểm AI Chấm (Gốc)</span>
+                    <span className="badge badge-blue" style={{ fontSize: '0.7rem' }}>Hệ thống AI</span>
+                  </div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#f1f5f9', marginBottom: '0.25rem' }}>
+                    {appeals[0]?.originalScore ?? appeals[0]?.previousScore ?? submission.totalScore} <span style={{ fontSize: '0.85rem', fontWeight: 'normal', color: '#94a3b8' }}>điểm</span>
+                  </div>
+                  <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>
+                    Chấm tự động qua Testcase Runner & AI Evaluation.
+                  </p>
+                </div>
+
+                {/* Tier 2: Phúc khảo Lần 1 (Giảng viên) */}
+                {appeals[0] && (
+                  <div style={{ background: '#090d16', padding: '0.85rem 1rem', borderRadius: '0.5rem', border: appeals[0].status === 'ACCEPTED' ? '1px solid rgba(52, 211, 153, 0.3)' : '1px solid var(--border)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                      <span style={{ fontSize: '0.8rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>2. Phúc khảo L1 (Giảng viên)</span>
+                      {getStatusBadge(appeals[0].status)}
                     </div>
-                    <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.25rem' }}>
-                      Lý do: <span style={{ color: '#cbd5e1' }}>{app.reason}</span>
-                    </p>
-                    {app.decisionReason && (
-                      <div style={{ marginTop: '0.5rem', padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '0.35rem', fontSize: '0.85rem' }}>
-                        <strong style={{ color: app.status === 'ACCEPTED' ? '#34d399' : '#f87171' }}>Phản hồi giảng viên: </strong>
-                        <span style={{ color: '#f1f5f9' }}>{app.decisionReason}</span>
-                        {app.newScore !== null && <span style={{ color: '#34d399', fontWeight: 'bold' }}> (Điểm cập nhật: {app.newScore})</span>}
+                    <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: appeals[0].newScore !== null ? '#34d399' : '#f1f5f9', marginBottom: '0.25rem' }}>
+                      {appeals[0].newScore !== null ? `${appeals[0].newScore}` : appeals[0].status === 'REJECTED' ? `${appeals[0].previousScore}` : '—'} <span style={{ fontSize: '0.85rem', fontWeight: 'normal', color: '#94a3b8' }}>{appeals[0].newScore !== null ? 'điểm (đã sửa)' : appeals[0].status === 'REJECTED' ? 'điểm (giữ nguyên)' : 'chưa có điểm'}</span>
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                      <strong>Người giải quyết: </strong>
+                      <span style={{ color: '#cbd5e1' }}>{appeals[0].resolvedBy?.fullName || 'Giảng viên phụ trách'}</span>
+                    </div>
+                    {appeals[0].decisionReason && (
+                      <div style={{ marginTop: '0.5rem', padding: '0.4rem 0.6rem', background: 'rgba(255,255,255,0.03)', borderRadius: '0.35rem', fontSize: '0.8rem' }}>
+                        <span style={{ color: '#94a3b8' }}>Nhận xét: </span>
+                        <span style={{ color: '#e2e8f0' }}>{appeals[0].decisionReason}</span>
                       </div>
                     )}
                   </div>
-                ))}
+                )}
+
+                {/* Tier 3: Phúc khảo Lần 2 (Khảo thí / Admin) */}
+                <div style={{ background: '#090d16', padding: '0.85rem 1rem', borderRadius: '0.5rem', border: appeals[1]?.status === 'ACCEPTED' ? '1px solid rgba(52, 211, 153, 0.4)' : '1px solid var(--border)', opacity: appeals[1] ? 1 : 0.7 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>3. Phúc khảo L2 (Khảo thí)</span>
+                    {appeals[1] ? getStatusBadge(appeals[1].status) : <span className="badge" style={{ opacity: 0.6 }}>Chưa tạo đơn</span>}
+                  </div>
+                  {appeals[1] ? (
+                    <>
+                      <div style={{ fontSize: '1.4rem', fontWeight: 'bold', color: appeals[1].newScore !== null ? '#38bdf8' : '#f1f5f9', marginBottom: '0.25rem' }}>
+                        {appeals[1].newScore !== null ? `${appeals[1].newScore}` : appeals[1].status === 'REJECTED' ? `${appeals[1].previousScore}` : '—'} <span style={{ fontSize: '0.85rem', fontWeight: 'normal', color: '#94a3b8' }}>{appeals[1].newScore !== null ? 'điểm (đã sửa)' : appeals[1].status === 'REJECTED' ? 'điểm (giữ nguyên)' : 'chờ xử lý'}</span>
+                      </div>
+                      <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                        <strong>Cán bộ Khảo thí: </strong>
+                        <span style={{ color: '#cbd5e1' }}>{appeals[1].resolvedBy?.fullName || 'Ban Khảo thí (Admin)'}</span>
+                      </div>
+                      {appeals[1].decisionReason && (
+                        <div style={{ marginTop: '0.5rem', padding: '0.4rem 0.6rem', background: 'rgba(255,255,255,0.03)', borderRadius: '0.35rem', fontSize: '0.8rem' }}>
+                          <span style={{ color: '#94a3b8' }}>Kết luận Khảo thí: </span>
+                          <span style={{ color: '#e2e8f0' }}>{appeals[1].decisionReason}</span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div style={{ paddingTop: '0.5rem', fontSize: '0.825rem', color: '#64748b' }}>
+                      {appeals.length === 1 && ['ACCEPTED', 'REJECTED'].includes(appeals[0].status)
+                        ? 'Có thể tạo đơn gửi lên Khảo thí nếu chưa hài lòng với kết quả của Giảng viên.'
+                        : 'Sẽ mở khi hoàn tất phúc khảo Lần 1 với Giảng viên.'}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Detailed Appeal History */}
+              <div style={{ marginTop: '1.25rem' }}>
+                <h5 style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Chi tiết các đơn khiếu nại đã gửi:</h5>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {appeals.map((app) => (
+                    <div key={app.id} style={{ background: '#090d16', padding: '0.75rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)' }}>
+                      <div className="appeal-history-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span className={`badge ${app.round === 2 || app.targetRole === 'ADMIN' ? 'badge-yellow' : 'badge-blue'}`} style={{ fontSize: '0.75rem' }}>
+                            {app.round === 2 || app.targetRole === 'ADMIN' ? 'Cấp 2: Khảo thí' : 'Cấp 1: Giảng viên'}
+                          </span>
+                          <strong style={{ fontSize: '0.95rem' }}>{app.title}</strong>
+                        </div>
+                        {getStatusBadge(app.status)}
+                      </div>
+                      <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '0.4rem', marginBottom: '0.25rem' }}>
+                        Lý do khiếu nại: <span style={{ color: '#cbd5e1' }}>{app.reason}</span>
+                      </p>
+                      {app.expectedScore !== null && (
+                        <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: 0 }}>
+                          Điểm kỳ vọng: <span style={{ color: '#f59e0b', fontWeight: 600 }}>{app.expectedScore} điểm</span>
+                        </p>
+                      )}
+                      {app.decisionReason && (
+                        <div style={{ marginTop: '0.5rem', padding: '0.5rem 0.75rem', background: 'rgba(255,255,255,0.03)', borderRadius: '0.35rem', fontSize: '0.85rem' }}>
+                          <strong style={{ color: app.status === 'ACCEPTED' ? '#34d399' : '#f87171' }}>
+                            Phản hồi từ {app.targetRole === 'ADMIN' || app.round === 2 ? 'Ban Khảo thí' : 'Giảng viên'}:{' '}
+                          </strong>
+                          <span style={{ color: '#f1f5f9' }}>{app.decisionReason}</span>
+                          {app.newScore !== null && <span style={{ color: '#34d399', fontWeight: 'bold' }}> (Điểm cập nhật: {app.newScore})</span>}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -575,10 +702,19 @@ export const SubmissionResultPage: React.FC = () => {
       {/* Appeal Creation Modal */}
       {showAppealModal && (
         <div className="form-modal-overlay">
-          <div className="card form-modal-panel" style={{ width: 'min(36rem, 100%)' }}>
-            <h3 style={{ marginBottom: '0.75rem' }}>Tạo Đơn Khiếu Nại Điểm</h3>
+          <div className="card form-modal-panel" style={{ width: 'min(38rem, 100%)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+              <span className={`badge ${appeals.length === 0 ? 'badge-blue' : 'badge-yellow'}`}>
+                {appeals.length === 0 ? 'Phúc khảo Lần 1: Giảng viên' : 'Phúc khảo Lần 2: Khảo thí (Admin)'}
+              </span>
+              <h3 style={{ margin: 0, fontSize: '1.2rem' }}>
+                {appeals.length === 0 ? 'Tạo Đơn Khiếu Nại Điểm Lần 1' : 'Tạo Đơn Khiếu Nại Điểm Lần 2 (Khảo thí)'}
+              </h3>
+            </div>
             <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginBottom: '1rem' }}>
-              Đơn khiếu nại sẽ được gửi trực tiếp vào Hộp thư giải quyết của Giảng viên phụ trách lớp học.
+              {appeals.length === 0
+                ? 'Đơn khiếu nại Lần 1 sẽ được gửi trực tiếp vào Hộp thư giải quyết của Giảng viên phụ trách lớp học.'
+                : 'Đơn khiếu nại Lần 2 sẽ được chuyển thẳng tới Ban Khảo thí (Admin) để thẩm định độc lập lần cuối cùng (Tối đa 2 lần).'}
             </p>
             {appealError && <p role="alert" style={{ color: '#f87171', marginBottom: '1rem' }}>{appealError}</p>}
             <form onSubmit={handleSubmitAppeal}>
@@ -594,7 +730,7 @@ export const SubmissionResultPage: React.FC = () => {
 
               <div className="appeal-score-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
-                  <label>Điểm hiện tại</label>
+                  <label>{appeals.length === 0 ? 'Điểm AI chấm ban đầu' : 'Điểm sau phúc khảo Lần 1'}</label>
                   <input
                     className="form-control"
                     value={`${submission.totalScore} điểm`}
@@ -622,7 +758,11 @@ export const SubmissionResultPage: React.FC = () => {
                 <textarea
                   className="form-control"
                   rows={4}
-                  placeholder="Mô tả chi tiết: Test case nào bạn nghi ngờ bị chấm sai? Lý do tại sao code chạy đúng nhưng bị trừ điểm?..."
+                  placeholder={
+                    appeals.length === 0
+                      ? 'Mô tả chi tiết: Test case nào bạn nghi ngờ bị chấm sai? Lý do tại sao code chạy đúng nhưng bị trừ điểm?...'
+                      : 'Nêu rõ lý do bạn chưa đồng ý với kết quả giải quyết của Giảng viên ở lần 1, các bằng chứng kỹ thuật bổ sung để Ban Khảo thí xem xét...'
+                  }
                   value={appealReason}
                   onChange={(e) => setAppealReason(e.target.value)}
                   required
@@ -643,7 +783,7 @@ export const SubmissionResultPage: React.FC = () => {
                   className="btn btn-primary"
                   disabled={submittingAppeal}
                 >
-                  {submittingAppeal ? 'Đang gửi...' : 'Xác nhận gửi khiếu nại'}
+                  {submittingAppeal ? 'Đang gửi...' : appeals.length === 0 ? 'Xác nhận gửi Giảng viên (Lần 1)' : 'Xác nhận gửi Khảo thí (Lần 2)'}
                 </button>
               </div>
             </form>
