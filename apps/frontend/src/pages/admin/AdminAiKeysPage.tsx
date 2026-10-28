@@ -139,7 +139,7 @@ export const AdminAiKeysPage: React.FC = () => {
     <div className="container" style={{ maxWidth: 1200, paddingTop: '1.5rem' }}>
       <div style={{ marginBottom: '1rem' }}>
         <Link to="/admin" style={{ color: '#60a5fa', fontSize: '0.9rem' }}>
-          ← Quay lại Tổng quan Quản trị
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg> Quay lại Tổng quan Quản trị
         </Link>
       </div>
 

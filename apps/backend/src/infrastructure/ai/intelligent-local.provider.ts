@@ -22,7 +22,11 @@ export class IntelligentLocalProvider implements IAiProvider {
     const diff = (input.difficulty || 'MEDIUM').toUpperCase() as 'EASY' | 'MEDIUM' | 'HARD';
     const topic = (input.topic || 'Cây nhị phân tìm kiếm (BST)').trim();
 
-    return this.craftExamByTopic(topic, diff, lang, input.testCaseCount || 5, input.additionalRequirements);
+    const exam = await this.craftExamByTopic(topic, diff, lang, input.testCaseCount || 5, input.additionalRequirements);
+    if (input.materialContent) {
+      exam.descriptionMd = `> 📖 **Căn cứ tài liệu bài giảng đính kèm:** Đề bài được thiết kế bám sát các khái niệm trọng tâm từ tài liệu / slide bài giảng.\n\n` + exam.descriptionMd;
+    }
+    return exam;
   }
 
   public async generateRubric(input: GenerateRubricInput): Promise<GeneratedRubricResult> {

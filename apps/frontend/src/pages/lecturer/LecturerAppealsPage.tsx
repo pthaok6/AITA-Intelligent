@@ -153,7 +153,7 @@ export const LecturerAppealsPage: React.FC = () => {
   return (
     <div className="container page-appeals" style={{ maxWidth: 1200 }}>
       <div style={{ marginBottom: '1rem' }}>
-        <Link to={dashboardPath}>← {dashboardLabel}</Link>
+        <Link to={dashboardPath} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 500 }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg> {dashboardLabel}</Link>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>

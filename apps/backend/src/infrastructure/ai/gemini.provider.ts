@@ -132,6 +132,10 @@ export class GeminiProvider implements IAiProvider {
 - Ngôn ngữ lập trình: ${input.language || 'PYTHON'}
 - Số lượng test case: ${input.testCaseCount || 5}
 ${input.additionalRequirements ? `- Yêu cầu bổ sung: ${input.additionalRequirements}` : ''}
+${input.materialContent ? `- NỘI DUNG TÀI LIỆU / BÀI GIẢNG / SLIDE ĐÍNH KÈM (Hãy phân tích kỹ các khái niệm, cấu trúc dữ liệu và thuật toán trong tài liệu này để soạn đề bài và test cases bám sát trực tiếp):
+"""
+${input.materialContent}
+"""` : ''}
 
 LƯU Ý: Không dùng ký hiệu LaTeX dạng gạch chéo ngược (như \\le, \\ge, \\mathcal). Hãy viết O(N), <=, >= trực tiếp bằng văn bản thông thường.
 

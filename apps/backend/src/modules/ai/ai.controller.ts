@@ -3,10 +3,39 @@ import { aiModuleService } from './ai.service';
 import { authenticateJwt, AuthRequest, requireRoles } from '../../middlewares/auth.middleware';
 import { UserRole } from '../../domain/enums';
 import { asyncRoute, HttpError } from '../../shared/http';
+import multer from 'multer';
+import { extractDocumentContent } from '../../infrastructure/ai/document-parser';
+
+const materialUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB max
+  fileFilter: (_req, file, callback) => {
+    if (!/\.(pdf|pptx|docx|txt|md|markdown)$/i.test(file.originalname)) {
+      callback(new HttpError(400, 'Chỉ hỗ trợ file .pdf, .pptx, .docx, .md hoặc .txt.'));
+      return;
+    }
+    callback(null, true);
+  },
+});
 import { prisma } from '../../infrastructure/database/prisma';
 import { classAccess } from '../classes/class-access';
 
 export const aiRouter = Router();
+
+// Trích xuất nội dung văn bản từ tài liệu bài giảng / slide đính kèm (.pdf, .pptx, .docx, .txt, .md)
+aiRouter.post(
+  '/parse-material',
+  authenticateJwt,
+  requireRoles(UserRole.LECTURER, UserRole.ADMIN),
+  materialUpload.single('materialFile'),
+  asyncRoute(async (req: AuthRequest, res: Response) => {
+    if (!req.file) {
+      throw new HttpError(400, 'Vui lòng chọn tệp slide hoặc tài liệu bài giảng (.pdf, .pptx, .docx, .md, .txt).');
+    }
+    const extracted = await extractDocumentContent(req.file.buffer, req.file.originalname);
+    res.json({ success: true, data: extracted });
+  })
+);
 
 // Giảng viên / Admin yêu cầu AI soạn đề bài và bộ testcase kèm barem điểm
 aiRouter.post(
@@ -14,7 +43,7 @@ aiRouter.post(
   authenticateJwt,
   requireRoles(UserRole.LECTURER, UserRole.ADMIN),
   asyncRoute(async (req: AuthRequest, res: Response) => {
-    const { topic, difficulty, language, testCaseCount, additionalRequirements } = req.body || {};
+    const { topic, difficulty, language, testCaseCount, additionalRequirements, materialContent } = req.body || {};
     if (!topic || typeof topic !== 'string' || !topic.trim()) {
       throw new HttpError(400, 'Chủ đề đề thi không được để trống.');
     }
@@ -24,6 +53,7 @@ aiRouter.post(
       language: language || 'PYTHON',
       testCaseCount: Number(testCaseCount) || 5,
       additionalRequirements: additionalRequirements ? String(additionalRequirements).trim() : undefined,
+      materialContent: materialContent ? String(materialContent).trim() : undefined,
     });
     res.json({ success: true, data: result });
   })

@@ -55,6 +55,10 @@ class OpenAIProvider {
 - Ngôn ngữ: ${input.language || 'PYTHON'}
 - Số test cases: ${input.testCaseCount || 5}
 ${input.additionalRequirements ? `- Yêu cầu: ${input.additionalRequirements}` : ''}
+${input.materialContent ? `- NỘI DUNG TÀI LIỆU / SLIDE BÀI GIẢNG ĐÍNH KÈM:
+"""
+${input.materialContent}
+"""` : ''}
 
 Trả về JSON có cấu trúc:
 {

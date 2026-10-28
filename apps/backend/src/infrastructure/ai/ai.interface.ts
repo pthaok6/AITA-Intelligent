@@ -4,6 +4,7 @@ export interface GenerateExamInput {
   language?: 'PYTHON' | 'CSHARP' | 'JAVA';
   testCaseCount?: number;
   additionalRequirements?: string;
+  materialContent?: string;
 }
 
 export interface GeneratedTestCase {

@@ -51,6 +51,14 @@ export const CreateExamPage: React.FC = () => {
   const [aiSuccessMessage, setAiSuccessMessage] = useState('');
   const [aiStatus, setAiStatus] = useState<{ geminiAvailable: boolean; openaiAvailable: boolean } | null>(null);
 
+  // Material / Slide Upload States for AI Analysis
+  const [materialFile, setMaterialFile] = useState<File | null>(null);
+  const [parsingMaterial, setParsingMaterial] = useState(false);
+  const [materialContent, setMaterialContent] = useState('');
+  const [materialInfo, setMaterialInfo] = useState<{ filename: string; wordCount: number; slideOrPageCount?: number } | null>(null);
+  const [showMaterialPreview, setShowMaterialPreview] = useState(false);
+  const materialInputRef = React.useRef<HTMLInputElement>(null);
+
   React.useEffect(() => {
     apiRequest('/ai/config-status').then(res => {
       if (res.success && res.data) setAiStatus(res.data);
@@ -69,6 +77,60 @@ export const CreateExamPage: React.FC = () => {
     const updated = [...testCases];
     (updated[index] as any)[field] = value;
     setTestCases(updated);
+  };
+
+  const handleMaterialSelected = async (candidate: File | null) => {
+    if (!candidate) return;
+    if (candidate.size > 25 * 1024 * 1024) {
+      setError('File tài liệu tối đa 25 MB.');
+      return;
+    }
+    const allowed = /\.(pdf|pptx|docx|txt|md|markdown)$/i.test(candidate.name);
+    if (!allowed) {
+      setError('Chỉ hỗ trợ tệp slide bài giảng (.pptx, .pdf) hoặc tài liệu văn bản (.docx, .md, .txt).');
+      return;
+    }
+
+    setMaterialFile(candidate);
+    setParsingMaterial(true);
+    setError('');
+    setAiSuccessMessage('');
+
+    try {
+      const data = new FormData();
+      data.append('materialFile', candidate);
+      const res = await apiRequest('/ai/parse-material', {
+        method: 'POST',
+        body: data,
+      });
+
+      if (res.success && res.data) {
+        setMaterialContent(res.data.text);
+        setMaterialInfo({
+          filename: res.data.filename,
+          wordCount: res.data.wordCount,
+          slideOrPageCount: res.data.slideOrPageCount,
+        });
+        setAiSuccessMessage(
+          `Đã phân tích tài liệu "${candidate.name}" (${res.data.wordCount} từ${res.data.slideOrPageCount ? ` · ${res.data.slideOrPageCount} trang/slide` : ''}). AI sẽ dùng nội dung này để sinh đề bài bám sát bài giảng!`
+        );
+      } else {
+        setError(res.message || 'Không thể trích xuất nội dung từ file tài liệu.');
+        setMaterialFile(null);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Lỗi khi tải tài liệu lên.');
+      setMaterialFile(null);
+    } finally {
+      setParsingMaterial(false);
+    }
+  };
+
+  const handleRemoveMaterial = () => {
+    setMaterialFile(null);
+    setMaterialContent('');
+    setMaterialInfo(null);
+    setShowMaterialPreview(false);
   };
 
   // AI Trigger: Tự động soạn đề thi & bộ testcase kèm barem điểm
@@ -90,6 +152,7 @@ export const CreateExamPage: React.FC = () => {
           language: allowedLanguage,
           testCaseCount: aiTestCount,
           additionalRequirements: aiRequirements.trim() || undefined,
+          materialContent: materialContent.trim() || undefined,
         }),
       });
 
@@ -108,7 +171,11 @@ export const CreateExamPage: React.FC = () => {
             }))
           );
         }
-        setAiSuccessMessage(`✨ AI đã soạn thành công đề bài "${res.data.title}" kèm Barem điểm và ${res.data.testCases.length} test cases! Bạn có thể xem trước và tinh chỉnh bên dưới.`);
+        if (materialInfo?.filename) {
+          setAiSuccessMessage(`✨ AI đã phân tích tài liệu "${materialInfo.filename}" và soạn thành công đề bài "${res.data.title}" kèm Barem điểm và ${res.data.testCases.length} test cases bám sát giáo trình!`);
+        } else {
+          setAiSuccessMessage(`✨ AI đã soạn thành công đề bài "${res.data.title}" kèm Barem điểm và ${res.data.testCases.length} test cases! Bạn có thể xem trước và tinh chỉnh bên dưới.`);
+        }
       } else {
         setError(res.message || 'Không thể sinh đề bài bằng AI.');
       }
@@ -150,7 +217,7 @@ export const CreateExamPage: React.FC = () => {
           newDesc = newDesc.trim() + '\n\n' + res.data.rubricMarkdown;
         }
         setDescriptionMd(newDesc);
-        setAiSuccessMessage('📋 AI đã sinh Barem điểm chuẩn 10.0 điểm và cập nhật vào cuối nội dung đề bài!');
+        setAiSuccessMessage('AI đã sinh Barem điểm chuẩn 10.0 điểm và cập nhật vào cuối nội dung đề bài!');
       } else {
         setError(res.message || 'Không thể sinh barem điểm.');
       }
@@ -221,7 +288,7 @@ export const CreateExamPage: React.FC = () => {
   return (
     <div className="container page-exam-create" style={{ maxWidth: '900px' }}>
       <div style={{ marginBottom: '1rem' }}>
-        <Link to="/lecturer">← Quay lại Dashboard</Link>
+        <Link to="/lecturer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 500 }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg> Quay lại Dashboard</Link>
       </div>
 
       {/* SECTION: AI EXAM & RUBRIC GENERATOR HUB */}
@@ -239,15 +306,15 @@ export const CreateExamPage: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
               {aiStatus?.geminiAvailable ? (
                 <span style={{ fontSize: '0.75rem', color: '#34d399', background: 'rgba(16, 185, 129, 0.15)', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid rgba(16, 185, 129, 0.4)', fontWeight: 600 }}>
-                  🟢 Đang chạy LLM thật: Google Gemini API (Online)
+                  <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', marginRight: '0.35rem' }}/>Đang chạy: Google Gemini API (Online)
                 </span>
               ) : aiStatus?.openaiAvailable ? (
                 <span style={{ fontSize: '0.75rem', color: '#34d399', background: 'rgba(16, 185, 129, 0.15)', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid rgba(16, 185, 129, 0.4)', fontWeight: 600 }}>
-                  🟢 Đang chạy LLM thật: OpenAI GPT-4o API (Online)
+                  <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981', marginRight: '0.35rem' }}/>Đang chạy: OpenAI GPT-4o API (Online)
                 </span>
               ) : (
                 <span style={{ fontSize: '0.75rem', color: '#fbbf24', background: 'rgba(245, 158, 11, 0.15)', padding: '0.2rem 0.6rem', borderRadius: '4px', border: '1px solid rgba(245, 158, 11, 0.4)' }}>
-                  🟠 Chế độ: Local Fallback Engine (Offline) · Để gọi Gemini trực tiếp, điền GEMINI_API_KEY vào apps/backend/.env
+                  <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#f59e0b', marginRight: '0.35rem' }}/>Local Fallback Engine (Offline) · Điền GEMINI_API_KEY vào apps/backend/.env để dùng Gemini
                 </span>
               )}
             </div>
@@ -318,14 +385,116 @@ export const CreateExamPage: React.FC = () => {
           />
         </div>
 
+        {/* MATERIAL / SLIDE UPLOAD SECTION */}
+        <div style={{ marginBottom: '1.25rem', padding: '0.85rem 1rem', background: 'var(--surface-inset)', borderRadius: 'var(--radius-control)', border: '1px solid var(--border)' }}>
+          <input
+            type="file"
+            ref={materialInputRef}
+            accept=".pdf,.pptx,.docx,.txt,.md,.markdown"
+            style={{ display: 'none' }}
+            disabled={generatingAi || parsingMaterial}
+            onChange={(e) => handleMaterialSelected(e.target.files?.[0] || null)}
+          />
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.4rem' }}>
+            <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              Tài liệu hoặc Slide bài giảng đính kèm (Tùy chọn)
+            </label>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Hỗ trợ: .pptx, .pdf, .docx, .md, .txt (tối đa 25 MB)
+            </span>
+          </div>
+
+          <p style={{ margin: '0 0 0.75rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+            Tải lên slide bài giảng (.pptx) hoặc tài liệu môn học (.pdf/.docx). AI sẽ đọc hiểu cấu trúc slide để thiết kế bài thi, câu hỏi và test case bám sát trực tiếp kiến thức trong bài giảng.
+          </p>
+
+          {parsingMaterial ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.65rem 0.85rem', background: 'rgba(59, 130, 246, 0.1)', borderRadius: 'var(--radius-control)', color: '#93c5fd', fontSize: '0.85rem' }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+              <span>Đang đọc và phân tích cấu trúc slide / tài liệu bài giảng...</span>
+            </div>
+          ) : !materialInfo ? (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              disabled={generatingAi}
+              onClick={() => materialInputRef.current?.click()}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Tải lên Slide hoặc Tài liệu bài giảng
+            </button>
+          ) : (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', padding: '0.55rem 0.75rem', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: 'var(--radius-control)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>
+                  <strong style={{ fontSize: '0.85rem', color: '#a7f3d0' }}>{materialInfo.filename}</strong>
+                  <span style={{ fontSize: '0.78rem', color: '#6ee7b7' }}>
+                    ({materialInfo.wordCount} từ{materialInfo.slideOrPageCount ? ` · ${materialInfo.slideOrPageCount} trang/slide` : ''})
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setShowMaterialPreview(!showMaterialPreview)}
+                    style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
+                  >
+                    {showMaterialPreview ? 'Thu gọn' : 'Xem nội dung'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost-danger btn-sm"
+                    onClick={handleRemoveMaterial}
+                    style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
+                  >
+                    Gỡ bỏ
+                  </button>
+                </div>
+              </div>
+
+              {showMaterialPreview && (
+                <div style={{ marginTop: '0.6rem' }}>
+                  <textarea
+                    className="form-control"
+                    rows={6}
+                    value={materialContent}
+                    onChange={(e) => setMaterialContent(e.target.value)}
+                    placeholder="Nội dung tài liệu trích xuất..."
+                    style={{ fontSize: '0.8rem', fontFamily: 'monospace' }}
+                  />
+                  <small style={{ color: 'var(--text-muted)', display: 'block', marginTop: '0.25rem', fontSize: '0.75rem' }}>
+                    Bạn có thể chỉnh sửa hoặc bổ sung các lưu ý trọng tâm để AI tập trung vào phần kiến thức mong muốn.
+                  </small>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
           <button
             type="button"
             className="btn btn-primary"
             disabled={generatingAi}
             onClick={handleAiGenerateExam}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}
           >
-            {generatingAi ? ' AI đang soạn đề bài & test case...' : ' AI Soạn Đề Bài & Sinh Barem'}
+            {generatingAi ? (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }}><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                AI đang soạn đề bài & test cases...
+              </>
+            ) : (
+              <>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                {materialInfo ? 'Phân tích tài liệu & Soạn đề bài' : 'AI Soạn Đề Bài & Sinh Barem'}
+              </>
+            )}
           </button>
           <button
             type="button"
