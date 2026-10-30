@@ -23,7 +23,7 @@ export const ClassRosterPage: React.FC = () => {
     if (!result.success) setError(result.message || 'Không thể ghi danh sinh viên.'); else await load();
   };
   return <div className="container">
-    <p><Link to="/lecturer">← Quay lại lớp học</Link></p>
+    <div style={{ marginBottom: '1.25rem' }}><Link to="/lecturer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 500 }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg> Quay lại lớp học</Link></div>
     <h2>{cls ? `Danh sách sinh viên: ${cls.name}` : 'Danh sách sinh viên'}</h2>
     {cls && <p>Mã lớp: {cls.classCode} · Học kỳ: {cls.semester}</p>}
     {error && <p role="alert" style={{ color: '#f87171' }}>{error}</p>}

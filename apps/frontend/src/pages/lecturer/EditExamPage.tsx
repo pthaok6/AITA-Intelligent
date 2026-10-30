@@ -63,7 +63,7 @@ export const EditExamPage: React.FC = () => {
 
   if (loading) return <div className="container"><p>Đang tải đề thi…</p></div>;
   return <div className="container" style={{ maxWidth: 900 }}>
-    <p><Link to={`/lecturer/classes/${classId}/exams`}>← Quay lại danh sách đề</Link></p>
+    <div style={{ marginBottom: '1.25rem' }}><Link to={`/lecturer/classes/${classId}/exams`} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 500 }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg> Quay lại danh sách đề</Link></div>
     <div className="card"><h2>Sửa đề thi và bộ test</h2>
       {error && <p role="alert" style={{ color: '#f87171' }}>{error}</p>}
       {form && <form onSubmit={save}>

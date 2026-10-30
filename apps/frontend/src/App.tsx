@@ -12,12 +12,14 @@ import { ExamTakePage } from './pages/student/ExamTakePage';
 import { SubmissionResultPage } from './pages/student/SubmissionResultPage';
 import { ImportStudentsPage } from './pages/lecturer/ImportStudentsPage';
 import { AdminUsersPage } from './pages/admin/AdminUsersPage';
+import { AdminAiKeysPage } from './pages/admin/AdminAiKeysPage';
 import { EditExamPage } from './pages/lecturer/EditExamPage';
 import { ClassRosterPage } from './pages/lecturer/ClassRosterPage';
 import { MySubmissionsPage } from './pages/student/MySubmissionsPage';
 import { MyAppealsPage } from './pages/student/MyAppealsPage';
 import { LecturerAppealsPage } from './pages/lecturer/LecturerAppealsPage';
 import { MyTeamsPage } from './pages/student/MyTeamsPage';
+import { ProfilePage } from './pages/auth/ProfilePage';
 
 const RootRedirect: React.FC = () => {
   const { isAuthenticated, user, loading } = useAuth();
@@ -67,6 +69,7 @@ export const App: React.FC = () => {
               <Route path="/admin" element={<ProtectedRoute allowedRoles={['ADMIN']}><LecturerDashboard /></ProtectedRoute>} />
               <Route path="/admin/appeals" element={<ProtectedRoute allowedRoles={['ADMIN']}><LecturerAppealsPage /></ProtectedRoute>} />
               <Route path="/admin/users" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminUsersPage /></ProtectedRoute>} />
+              <Route path="/admin/ai-keys" element={<ProtectedRoute allowedRoles={['ADMIN']}><AdminAiKeysPage /></ProtectedRoute>} />
               <Route path="/lecturer/classes/:classId/import-students" element={<ProtectedRoute allowedRoles={['LECTURER']}><ImportStudentsPage /></ProtectedRoute>} />
               <Route path="/lecturer/classes/:classId/exams/:examId/edit" element={<ProtectedRoute allowedRoles={['LECTURER', 'ADMIN']}><EditExamPage /></ProtectedRoute>} />
               <Route path="/lecturer/classes/:classId/students" element={<ProtectedRoute allowedRoles={['LECTURER', 'ADMIN']}><ClassRosterPage /></ProtectedRoute>} />
@@ -138,6 +141,7 @@ export const App: React.FC = () => {
                   </ProtectedRoute>
                 }
               />
+              <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
 
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

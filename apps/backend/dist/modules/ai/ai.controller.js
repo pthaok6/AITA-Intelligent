@@ -1,4 +1,7 @@
 "use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.aiRouter = void 0;
 const express_1 = require("express");
@@ -6,12 +9,33 @@ const ai_service_1 = require("./ai.service");
 const auth_middleware_1 = require("../../middlewares/auth.middleware");
 const enums_1 = require("../../domain/enums");
 const http_1 = require("../../shared/http");
+const multer_1 = __importDefault(require("multer"));
+const document_parser_1 = require("../../infrastructure/ai/document-parser");
+const materialUpload = (0, multer_1.default)({
+    storage: multer_1.default.memoryStorage(),
+    limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB max
+    fileFilter: (_req, file, callback) => {
+        if (!/\.(pdf|pptx|docx|txt|md|markdown)$/i.test(file.originalname)) {
+            callback(new http_1.HttpError(400, 'Chỉ hỗ trợ file .pdf, .pptx, .docx, .md hoặc .txt.'));
+            return;
+        }
+        callback(null, true);
+    },
+});
 const prisma_1 = require("../../infrastructure/database/prisma");
 const class_access_1 = require("../classes/class-access");
 exports.aiRouter = (0, express_1.Router)();
+// Trích xuất nội dung văn bản từ tài liệu bài giảng / slide đính kèm (.pdf, .pptx, .docx, .txt, .md)
+exports.aiRouter.post('/parse-material', auth_middleware_1.authenticateJwt, (0, auth_middleware_1.requireRoles)(enums_1.UserRole.LECTURER, enums_1.UserRole.ADMIN), materialUpload.single('materialFile'), (0, http_1.asyncRoute)(async (req, res) => {
+    if (!req.file) {
+        throw new http_1.HttpError(400, 'Vui lòng chọn tệp slide hoặc tài liệu bài giảng (.pdf, .pptx, .docx, .md, .txt).');
+    }
+    const extracted = await (0, document_parser_1.extractDocumentContent)(req.file.buffer, req.file.originalname);
+    res.json({ success: true, data: extracted });
+}));
 // Giảng viên / Admin yêu cầu AI soạn đề bài và bộ testcase kèm barem điểm
 exports.aiRouter.post('/generate-exam', auth_middleware_1.authenticateJwt, (0, auth_middleware_1.requireRoles)(enums_1.UserRole.LECTURER, enums_1.UserRole.ADMIN), (0, http_1.asyncRoute)(async (req, res) => {
-    const { topic, difficulty, language, testCaseCount, additionalRequirements } = req.body || {};
+    const { topic, difficulty, language, testCaseCount, additionalRequirements, materialContent } = req.body || {};
     if (!topic || typeof topic !== 'string' || !topic.trim()) {
         throw new http_1.HttpError(400, 'Chủ đề đề thi không được để trống.');
     }
@@ -21,6 +45,7 @@ exports.aiRouter.post('/generate-exam', auth_middleware_1.authenticateJwt, (0, a
         language: language || 'PYTHON',
         testCaseCount: Number(testCaseCount) || 5,
         additionalRequirements: additionalRequirements ? String(additionalRequirements).trim() : undefined,
+        materialContent: materialContent ? String(materialContent).trim() : undefined,
     });
     res.json({ success: true, data: result });
 }));
@@ -57,10 +82,20 @@ exports.aiRouter.post('/review-submission/:id', auth_middleware_1.authenticateJw
     if (!submission) {
         throw new http_1.HttpError(404, 'Không tìm thấy bài nộp.');
     }
-    // Permission check: Sinh viên là chủ bài nộp hoặc giảng viên của lớp
+    // Permission check: Sinh viên là chủ bài nộp hoặc thành viên nhóm hoặc giảng viên của lớp
     if (req.user.role === enums_1.UserRole.STUDENT) {
         if (submission.studentId !== req.user.userId) {
-            throw new http_1.HttpError(403, 'Bạn không có quyền yêu cầu review cho bài nộp của người khác.');
+            if (submission.teamId) {
+                const membership = await prisma_1.prisma.teamMember.findUnique({
+                    where: { teamId_studentId: { teamId: submission.teamId, studentId: req.user.userId } },
+                });
+                if (!membership) {
+                    throw new http_1.HttpError(403, 'Bạn không có quyền yêu cầu review cho bài nộp của nhóm khác.');
+                }
+            }
+            else {
+                throw new http_1.HttpError(403, 'Bạn không có quyền yêu cầu review cho bài nộp của người khác.');
+            }
         }
     }
     else {
@@ -81,13 +116,17 @@ exports.aiRouter.get('/reviews/:submissionId', auth_middleware_1.authenticateJwt
     }
     if (req.user.role === enums_1.UserRole.STUDENT) {
         if (submission.studentId !== req.user.userId) {
-            throw new http_1.HttpError(403, 'Không có quyền truy cập bài nộp này.');
-        }
-        // Check if scores are released
-        const scoreReleased = new Date() >= submission.exam.endTime;
-        if (!scoreReleased) {
-            res.json({ success: true, data: [] });
-            return;
+            if (submission.teamId) {
+                const membership = await prisma_1.prisma.teamMember.findUnique({
+                    where: { teamId_studentId: { teamId: submission.teamId, studentId: req.user.userId } },
+                });
+                if (!membership) {
+                    throw new http_1.HttpError(403, 'Không có quyền truy cập bài nộp này.');
+                }
+            }
+            else {
+                throw new http_1.HttpError(403, 'Không có quyền truy cập bài nộp này.');
+            }
         }
     }
     else {
@@ -96,7 +135,36 @@ exports.aiRouter.get('/reviews/:submissionId', auth_middleware_1.authenticateJwt
     const reviews = await ai_service_1.aiModuleService.getReviewsBySubmission(submissionId);
     res.json({ success: true, data: reviews });
 }));
+const key_pool_1 = require("../../infrastructure/ai/key-pool");
 // Kiểm tra trạng thái hệ thống AI và Key Pool
 exports.aiRouter.get('/config-status', auth_middleware_1.authenticateJwt, (0, http_1.asyncRoute)(async (_req, res) => {
     res.json({ success: true, data: ai_service_1.aiModuleService.getStatus() });
+}));
+// UC14 — Manage AI API Key Rotation (Admin endpoints)
+exports.aiRouter.get('/admin/keys', auth_middleware_1.authenticateJwt, (0, auth_middleware_1.requireRoles)(enums_1.UserRole.ADMIN), (0, http_1.asyncRoute)(async (_req, res) => {
+    res.json({ success: true, data: key_pool_1.keyPool.listKeys() });
+}));
+exports.aiRouter.post('/admin/keys', auth_middleware_1.authenticateJwt, (0, auth_middleware_1.requireRoles)(enums_1.UserRole.ADMIN), (0, http_1.asyncRoute)(async (req, res) => {
+    const { provider, key, probeFirst } = req.body || {};
+    if (!provider || !['gemini', 'openai'].includes(provider)) {
+        throw new http_1.HttpError(400, 'Nhà cung cấp AI không hợp lệ (hỗ trợ gemini hoặc openai).');
+    }
+    const entry = await key_pool_1.keyPool.addCustomKey(provider, key, probeFirst !== false);
+    res.status(201).json({ success: true, data: entry, message: 'Thêm Key vào Pool thành công.' });
+}));
+exports.aiRouter.delete('/admin/keys/:id', auth_middleware_1.authenticateJwt, (0, auth_middleware_1.requireRoles)(enums_1.UserRole.ADMIN), (0, http_1.asyncRoute)(async (req, res) => {
+    const ok = key_pool_1.keyPool.removeKey(String(req.params.id));
+    if (!ok)
+        throw new http_1.HttpError(404, 'Không tìm thấy Key cần xóa.');
+    res.json({ success: true, message: 'Đã xóa Key khỏi Pool.' });
+}));
+exports.aiRouter.post('/admin/keys/:id/reset', auth_middleware_1.authenticateJwt, (0, auth_middleware_1.requireRoles)(enums_1.UserRole.ADMIN), (0, http_1.asyncRoute)(async (req, res) => {
+    const ok = key_pool_1.keyPool.resetKey(String(req.params.id));
+    if (!ok)
+        throw new http_1.HttpError(404, 'Không tìm thấy Key cần reset.');
+    res.json({ success: true, message: 'Đã reset cooldown cho Key.' });
+}));
+exports.aiRouter.post('/admin/keys/:id/probe', auth_middleware_1.authenticateJwt, (0, auth_middleware_1.requireRoles)(enums_1.UserRole.ADMIN), (0, http_1.asyncRoute)(async (req, res) => {
+    const probe = await key_pool_1.keyPool.probeKey(String(req.params.id));
+    res.json({ success: true, data: probe });
 }));

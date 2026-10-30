@@ -11,7 +11,7 @@ export const ACCESS_SECONDS = 15 * 60;
 export const REFRESH_SECONDS = 7 * 24 * 60 * 60;
 export const hashToken = (value: string) => createHash('sha256').update(value).digest('hex');
 const googleClient = new OAuth2Client();
-export const publicUser = (user: User) => ({ id: user.id, email: user.email, fullName: user.fullName, role: user.role });
+export const publicUser = (user: User) => ({ id: user.id, email: user.email, fullName: user.fullName, role: user.role, avatarUrl: user.avatarUrl });
 
 export function institutionalEmail(value: unknown): string {
   if (typeof value !== 'string') throw new HttpError(400, 'Email không hợp lệ.');
@@ -141,6 +141,67 @@ export class AuthService {
       } catch { /* Invalid access token cannot select a session to revoke. */ }
     }
     if (selectors.length) await this.db.authSession.updateMany({ where: { OR: selectors, revokedAt: null }, data: { revokedAt: new Date() } });
+  }
+  async getProfile(userId: string) {
+    const user = await this.db.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, fullName: true, role: true, avatarUrl: true, createdAt: true },
+    });
+    if (!user) throw new HttpError(404, 'Không tìm thấy người dùng.');
+    return user;
+  }
+  async updateProfile(userId: string, data: { fullName?: string; avatarUrl?: string | null; currentPassword?: string; newPassword?: string }) {
+    const user = await this.db.user.findUnique({ where: { id: userId } });
+    if (!user) throw new HttpError(404, 'Không tìm thấy người dùng.');
+
+    const updateData: Prisma.UserUpdateInput = {};
+
+    if (data.fullName !== undefined) {
+      const name = String(data.fullName).trim();
+      if (!name || name.length > 100) throw new HttpError(400, 'Họ tên cần từ 1 đến 100 ký tự.');
+      updateData.fullName = name;
+    }
+
+    if (data.avatarUrl !== undefined) {
+      if (data.avatarUrl === null || data.avatarUrl === '') {
+        updateData.avatarUrl = null;
+      } else {
+        const url = String(data.avatarUrl).trim();
+        if (url.startsWith('data:image/')) {
+          if (!/^data:image\/(png|jpeg|jpg);base64,/i.test(url)) {
+            throw new HttpError(400, 'Ảnh đại diện chỉ chấp nhận định dạng PNG hoặc JPG (FR-PROF-002).');
+          }
+          const base64Data = url.substring(url.indexOf(',') + 1);
+          const sizeBytes = (base64Data.length * 3) / 4;
+          if (sizeBytes > 2 * 1024 * 1024) {
+            throw new HttpError(400, 'Kích thước ảnh đại diện vượt quá 2 MB (FR-PROF-002).');
+          }
+          updateData.avatarUrl = url;
+        } else if (/^https?:\/\//i.test(url)) {
+          updateData.avatarUrl = url;
+        } else {
+          throw new HttpError(400, 'Định dạng ảnh đại diện không hợp lệ.');
+        }
+      }
+    }
+
+    if (data.newPassword) {
+      if (typeof data.newPassword !== 'string' || data.newPassword.length < 8 || Buffer.byteLength(data.newPassword) > 72) {
+        throw new HttpError(400, 'Mật khẩu mới cần từ 8 ký tự và không quá 72 byte.');
+      }
+      if (user.passwordHash) {
+        if (!data.currentPassword || !(await bcrypt.compare(String(data.currentPassword), user.passwordHash))) {
+          throw new HttpError(400, 'Mật khẩu hiện tại không chính xác.');
+        }
+      }
+      updateData.passwordHash = await bcrypt.hash(data.newPassword, 12);
+    }
+
+    return this.db.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: { id: true, email: true, fullName: true, role: true, avatarUrl: true, createdAt: true },
+    });
   }
 }
 export const authService = new AuthService();

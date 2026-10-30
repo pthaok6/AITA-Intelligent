@@ -310,31 +310,39 @@ model GitContribution {
 }
 
 model Appeal {
-  id             String      @id @default(uuid())
-  submissionId   String
-  studentId      String
-  examId         String
-  title          String      @default("Khiếu nại kết quả chấm")
-  reason         String
-  expectedScore  Float?
-  status         String      @default("SUBMITTED") // SUBMITTED, IN_REVIEW, ACCEPTED, REJECTED
-  decisionReason String?
-  previousScore  Float
-  newScore       Float?
-  resolvedById   String?
-  resolvedAt     DateTime?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  id              String      @id @default(uuid())
+  submissionId    String
+  studentId       String
+  examId          String
+  round           Int         @default(1) // 1: Phúc khảo Lần 1 (Giảng viên), 2: Phúc khảo Lần 2 (Khảo thí / Admin)
+  targetRole      String      @default("LECTURER") // LECTURER hoặc ADMIN
+  title           String      @default("Khiếu nại kết quả chấm")
+  reason          String
+  expectedScore   Float?
+  status          String      @default("SUBMITTED") // SUBMITTED, IN_REVIEW, ACCEPTED, REJECTED
+  decisionReason  String?
+  originalScore   Float?      // Điểm số gốc ban đầu từ hệ thống / AI để so sánh minh bạch
+  previousScore   Float
+  newScore        Float?
+  resolvedById    String?
+  resolvedAt      DateTime?
+  parentAppealId  String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 
   submission     Submission  @relation(fields: [submissionId], references: [id], onDelete: Cascade)
   student        User        @relation("StudentAppeals", fields: [studentId], references: [id], onDelete: Cascade)
   exam           Exam        @relation(fields: [examId], references: [id], onDelete: Cascade)
   resolvedBy     User?       @relation("ResolvedAppeals", fields: [resolvedById], references: [id], onDelete: Restrict)
+  parentAppeal   Appeal?     @relation("AppealRounds", fields: [parentAppealId], references: [id], onDelete: SetNull)
+  childAppeals   Appeal[]    @relation("AppealRounds")
 
   @@index([studentId])
   @@index([examId])
   @@index([submissionId])
   @@index([status])
+  @@index([round])
+  @@index([targetRole])
   @@map("appeals")
 }
 

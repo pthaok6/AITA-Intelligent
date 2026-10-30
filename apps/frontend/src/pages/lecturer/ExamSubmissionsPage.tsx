@@ -281,19 +281,38 @@ export const ExamSubmissionsPage: React.FC = () => {
   }, [selectedExamId]);
 
   return (
-    <div className="container">
-      <div style={{ marginBottom: '1rem' }}>
-        <Link to="/lecturer">← Quay lại Dashboard</Link>
+    <div className="container" style={{ paddingBottom: '3rem' }}>
+      <div style={{ marginBottom: '1.5rem' }}>
+        <Link to="/lecturer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', color: 'var(--text-secondary)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 500 }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+          Quay lại Dashboard
+        </Link>
       </div>
 
-      <h2>Danh sách Đề thi & Kết quả Bài nộp</h2>
-      {error && <p role="alert" style={{ color: '#f87171' }}>{error}</p>}
+      <h2 style={{ fontSize: '1.6rem', fontWeight: 800, letterSpacing: '-0.02em', margin: '0 0 0.4rem' }}>Danh sách Đề thi & Kết quả Bài nộp</h2>
+      {error && (
+        <div role="alert" style={{ padding: '0.75rem 1rem', borderRadius: 'var(--radius-control)', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#fca5a5', marginBottom: '1rem', fontSize: '0.9rem' }}>
+          {error}
+        </div>
+      )}
 
       {loading ? (
-        <p>Đang tải...</p>
+        <div className="lecturer-class-list" style={{ marginTop: '1.5rem' }}>
+          {[1, 2].map(n => (
+            <div key={n} className="skeleton-box" style={{ height: '160px' }}>
+              <div className="skeleton-line" style={{ width: '45%' }} />
+              <div className="skeleton-line" style={{ width: '70%', height: '1.3rem', margin: '0.75rem 0' }} />
+              <div className="skeleton-line" style={{ width: '35%' }} />
+            </div>
+          ))}
+        </div>
       ) : exams.length === 0 ? (
-        <div className="card" style={{ marginTop: '1rem', textAlign: 'center' }}>
-          <p>Lớp học này chưa có đề thi nào.</p>
+        <div className="empty-state-box" style={{ marginTop: '1.5rem' }}>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2" style={{ marginBottom: '0.75rem' }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: '0 0 0.5rem' }}>Lớp học này chưa có đề thi nào</h3>
+          <p style={{ color: 'var(--text-secondary)', margin: 0 }}>Hãy tạo đề thi mới từ Dashboard giảng viên.</p>
         </div>
       ) : (
         <div style={{ marginTop: '1.5rem' }}>
@@ -311,8 +330,9 @@ export const ExamSubmissionsPage: React.FC = () => {
 
           {selectedExam && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '1rem', background: '#090d16', border: '1px solid var(--border)', borderRadius: '0.5rem', padding: '0.75rem 1rem' }}>
-              <div style={{ fontSize: '0.875rem', color: '#94a3b8' }}>
-                ⏰ Thời gian: <strong style={{ color: '#60a5fa' }}>{new Date(selectedExam.startTime).toLocaleString('vi-VN')}</strong> — <strong style={{ color: '#f87171' }}>{new Date(selectedExam.endTime).toLocaleString('vi-VN')}</strong>
+              <div style={{ fontSize: '0.875rem', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Thời gian: <strong style={{ color: '#60a5fa' }}>{new Date(selectedExam.startTime).toLocaleString('vi-VN')}</strong> — <strong style={{ color: '#f87171' }}>{new Date(selectedExam.endTime).toLocaleString('vi-VN')}</strong>
                 {selectedExam.timeLimitMs && <span> • CPU: <strong>{selectedExam.timeLimitMs}ms</strong></span>}
                 {selectedExam.memoryLimitMb && <span> • RAM: <strong>{selectedExam.memoryLimitMb}MiB</strong></span>}
               </div>
@@ -647,7 +667,12 @@ export const ExamSubmissionsPage: React.FC = () => {
                     <tr key={sub.id}>
                       <td>
                         <strong>{sub.student?.fullName || 'Sinh viên'}</strong>
-                        {sub.team && <div style={{ fontSize: '0.8rem', color: '#38bdf8' }}>👥 Nhóm: {sub.team.name}</div>}
+                        {sub.team && (
+                          <div style={{ fontSize: '0.8rem', color: '#38bdf8', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            Nhóm: {sub.team.name}
+                          </div>
+                        )}
                         <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{sub.student?.email || ''}</div>
                       </td>
                       <td>{formatDate(sub.submittedAt)}</td>
@@ -661,8 +686,9 @@ export const ExamSubmissionsPage: React.FC = () => {
                       </td>
                       <td>
                         {sub.aiReviews?.[0] ? (
-                          <span className={`badge ${sub.aiReviews[0].cleanCodeScore >= 8.5 ? 'badge-green' : sub.aiReviews[0].cleanCodeScore >= 7.0 ? 'badge-blue' : sub.aiReviews[0].cleanCodeScore >= 5.0 ? 'badge-yellow' : 'badge-red'}`}>
-                            ✨ {sub.aiReviews[0].cleanCodeScore}/10
+                          <span className={`badge ${sub.aiReviews[0].cleanCodeScore >= 8.5 ? 'badge-green' : sub.aiReviews[0].cleanCodeScore >= 7.0 ? 'badge-blue' : sub.aiReviews[0].cleanCodeScore >= 5.0 ? 'badge-yellow' : 'badge-red'}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                            {sub.aiReviews[0].cleanCodeScore}/10
                           </span>
                         ) : (
                           <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Chưa review</span>
@@ -713,13 +739,24 @@ export const ExamSubmissionsPage: React.FC = () => {
                 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}
                 title={submissions.length < 2 ? 'Cần ít nhất 2 bài nộp để đối soát đạo văn' : 'Chạy lại toàn bộ thuật toán AST Winnowing'}
               >
-                {scanningPlagiarism ? '⏳ Đang quét...' : '🚀 Quét lại toàn bộ bài thi'}
+                {scanningPlagiarism ? (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                    Đang quét...
+                  </>
+                ) : (
+                  <>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    Quét lại toàn bộ bài thi
+                  </>
+                )}
               </button>
             </div>
 
             {plagiarismScanMessage && (
-              <div style={{ padding: '0.75rem 1rem', backgroundColor: '#064e3b', border: '1px solid #059669', borderRadius: '0.5rem', color: '#a7f3d0', fontSize: '0.875rem', marginBottom: '1rem' }}>
-                ✓ {plagiarismScanMessage}
+              <div style={{ padding: '0.75rem 1rem', backgroundColor: '#064e3b', border: '1px solid #059669', borderRadius: '0.5rem', color: '#a7f3d0', fontSize: '0.875rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                {plagiarismScanMessage}
               </div>
             )}
 
@@ -757,7 +794,7 @@ export const ExamSubmissionsPage: React.FC = () => {
               <div style={{ flex: 1, minWidth: '220px' }}>
                 <input
                   type="text"
-                  placeholder="🔍 Tìm theo tên hoặc email sinh viên..."
+                  placeholder="Tìm theo tên hoặc email sinh viên..."
                   value={plagiarismSearch}
                   onChange={(e) => setPlagiarismSearch(e.target.value)}
                   style={{ width: '100%', padding: '0.45rem 0.75rem', backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '0.375rem', color: '#f8fafc', fontSize: '0.85rem' }}
@@ -890,13 +927,22 @@ export const ExamSubmissionsPage: React.FC = () => {
                                     : 'badge-blue'
                                 }`}
                               >
-                                {report.status === 'CONFIRMED'
-                                  ? '🚨 GIAN LẬN'
-                                  : report.status === 'DISMISSED'
-                                  ? '✓ HỢP LỆ'
-                                  : report.status === 'SUSPECTED'
-                                  ? '⚠️ NGHI VẤN'
-                                  : report.status}
+                                {report.status === 'CONFIRMED' ? (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                    GIAN LẬN
+                                  </span>
+                                ) : report.status === 'DISMISSED' ? (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                                    HỢP LỆ
+                                  </span>
+                                ) : report.status === 'SUSPECTED' ? (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                    NGHI VẤN
+                                  </span>
+                                ) : report.status}
                               </span>
                             </td>
 
@@ -910,7 +956,8 @@ export const ExamSubmissionsPage: React.FC = () => {
                                 onClick={() => setInvestigatingReportId(report.id)}
                                 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontWeight: 600 }}
                               >
-                                🔍 So sánh chi tiết
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                So sánh chi tiết
                               </button>
                             </td>
                           </tr>

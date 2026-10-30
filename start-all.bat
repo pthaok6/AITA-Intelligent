@@ -31,12 +31,18 @@ if not exist "apps\backend\.env" (
 )
 
 echo.
-echo [1/4] Dang khoi dong PostgreSQL va Redis...
+echo [0/5] Dang don dep cac tien trinh cu tren cong 5000, 5173, 5555 neu co...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr "LISTENING" ^| findstr ":5000 :5173 :5555"') do (
+    taskkill /PID %%a /T /F >nul 2>&1
+)
+
+echo.
+echo [1/5] Dang khoi dong PostgreSQL va Redis...
 docker compose up -d --wait postgres redis
 if errorlevel 1 goto failed
 
 echo.
-echo [2/4] Dang cap nhat database va Prisma Client...
+echo [2/5] Dang cap nhat database va Prisma Client...
 call npm.cmd run db:setup
 if errorlevel 1 goto failed
 

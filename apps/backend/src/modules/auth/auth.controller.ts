@@ -41,7 +41,16 @@ authRouter.post('/logout', asyncRoute(async (req, res) => {
   res.json({ success: true });
 }));
 authRouter.get('/me', authenticateJwt, asyncRoute(async (req: AuthRequest, res) => {
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.userId }, select: { id: true, email: true, role: true, fullName: true } });
+  const user = await prisma.user.findUniqueOrThrow({ where: { id: req.user!.userId }, select: { id: true, email: true, role: true, fullName: true, avatarUrl: true } });
   res.setHeader('Cache-Control', 'no-store');
   res.json({ success: true, data: user });
 }));
+authRouter.get('/profile', authenticateJwt, asyncRoute(async (req: AuthRequest, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json({ success: true, data: await authService.getProfile(req.user!.userId) });
+}));
+authRouter.patch('/profile', authenticateJwt, asyncRoute(async (req: AuthRequest, res) => {
+  const updated = await authService.updateProfile(req.user!.userId, req.body || {});
+  res.json({ success: true, data: updated, message: 'Cập nhật hồ sơ thành công.' });
+}));
+

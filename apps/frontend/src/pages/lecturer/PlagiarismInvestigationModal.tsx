@@ -269,7 +269,8 @@ export const PlagiarismInvestigationModal: React.FC<PlagiarismInvestigationModal
                   color: selectedFileIndex === idx ? '#ffffff' : '#94a3b8',
                 }}
               >
-                📄 {f.path}
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true" style={{ flexShrink: 0 }}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                {f.path}
               </button>
             ))}
           </div>
@@ -299,7 +300,10 @@ export const PlagiarismInvestigationModal: React.FC<PlagiarismInvestigationModal
           {/* LEFT: STUDENT A */}
           <div style={paneStyle}>
             <div style={paneHeaderStyle('blue')}>
-              <span>👤 {submissionA.student?.fullName} ({currentFileA.path || 'Source code'})</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                {submissionA.student?.fullName} ({currentFileA.path || 'Source code'})
+              </span>
               <span style={{ fontSize: '0.75rem' }}>{linesA.length} dòng</span>
             </div>
             <div style={codeWrapperStyle}>
@@ -353,7 +357,10 @@ export const PlagiarismInvestigationModal: React.FC<PlagiarismInvestigationModal
           {/* RIGHT: STUDENT B */}
           <div style={paneStyle}>
             <div style={paneHeaderStyle('pink')}>
-              <span>👤 {submissionB.student?.fullName} ({currentFileB.path || 'Source code'})</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                {submissionB.student?.fullName} ({currentFileB.path || 'Source code'})
+              </span>
               <span style={{ fontSize: '0.75rem' }}>{linesB.length} dòng</span>
             </div>
             <div style={codeWrapperStyle}>
@@ -408,8 +415,9 @@ export const PlagiarismInvestigationModal: React.FC<PlagiarismInvestigationModal
         {/* DECISION & LECTURER REVIEW PANEL */}
         <div style={footerStyle}>
           <div style={{ flex: 1 }}>
-            <label style={{ display: 'block', fontSize: '0.85rem', color: '#cbd5e1', marginBottom: '0.35rem' }}>
-              📝 Ghi chú nhận xét của Giảng viên:
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: '#cbd5e1', marginBottom: '0.35rem' }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Ghi chú nhận xét của Giảng viên:
             </label>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <input
@@ -455,7 +463,8 @@ export const PlagiarismInvestigationModal: React.FC<PlagiarismInvestigationModal
               disabled={updating}
               onClick={() => handleUpdateStatus('CONFIRMED')}
             >
-              🚨 Xác nhận Gian lận (CONFIRMED)
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              Xác nhận Gian lận (CONFIRMED)
             </button>
 
             <button

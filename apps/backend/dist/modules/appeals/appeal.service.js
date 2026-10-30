@@ -36,16 +36,38 @@ class AppealService {
         if (!scoreReleased) {
             throw new http_1.HttpError(400, 'Bài thi chưa kết thúc hoặc kết quả chưa được công bố để khiếu nại.');
         }
-        // Check for existing active appeal
-        const existingActive = await prisma_1.prisma.appeal.findFirst({
+        // Fetch all existing appeals for this submission by this student
+        const existingAppeals = await prisma_1.prisma.appeal.findMany({
             where: {
                 submissionId: input.submissionId,
                 studentId: userId,
-                status: { in: ['SUBMITTED', 'IN_REVIEW'] },
             },
+            orderBy: { round: 'asc' },
         });
-        if (existingActive) {
-            throw new http_1.HttpError(400, 'Bạn đã có một đơn khiếu nại đang chờ xử lý cho bài nộp này.');
+        // Rule: Maximum 2 appeals per submission
+        if (existingAppeals.length >= 2) {
+            throw new http_1.HttpError(400, 'Mỗi sinh viên chỉ được phép phúc khảo, khiếu nại tối đa 2 lần trên một bài nộp.');
+        }
+        // Check if any existing appeal is currently active (in review or pending)
+        const hasActive = existingAppeals.some(a => ['SUBMITTED', 'IN_REVIEW'].includes(a.status));
+        if (hasActive) {
+            throw new http_1.HttpError(400, 'Bạn đang có một đơn khiếu nại đang chờ xử lý cho bài nộp này.');
+        }
+        let round = 1;
+        let targetRole = 'LECTURER';
+        let parentAppealId = null;
+        let originalScore = submission.totalScore;
+        let defaultTitle = `Phúc khảo Lần 1 (Gửi Giảng viên) - ${submission.exam.title}`;
+        if (existingAppeals.length === 1) {
+            const firstAppeal = existingAppeals[0];
+            if (!['ACCEPTED', 'REJECTED'].includes(firstAppeal.status)) {
+                throw new http_1.HttpError(400, 'Đơn khiếu nại lần 1 của bạn chưa được giải quyết xong.');
+            }
+            round = 2;
+            targetRole = 'ADMIN'; // Gửi lên Khảo thí (Admin)
+            parentAppealId = firstAppeal.id;
+            originalScore = firstAppeal.originalScore ?? firstAppeal.previousScore;
+            defaultTitle = `Phúc khảo Lần 2 (Gửi Khảo thí) - ${submission.exam.title}`;
         }
         const expectedScore = typeof input.expectedScore === 'number' && !isNaN(input.expectedScore)
             ? Math.max(0, Math.min(100, input.expectedScore))
@@ -55,10 +77,14 @@ class AppealService {
                 submissionId: input.submissionId,
                 studentId: userId,
                 examId: submission.examId,
-                title: input.title?.trim() || `Khiếu nại điểm - ${submission.exam.title}`,
+                round,
+                targetRole,
+                parentAppealId,
+                originalScore,
+                previousScore: submission.totalScore,
+                title: input.title?.trim() || defaultTitle,
                 reason: input.reason.trim(),
                 expectedScore,
-                previousScore: submission.totalScore,
                 status: 'SUBMITTED',
             },
             include: {
@@ -83,6 +109,23 @@ class AppealService {
                         totalScore: true,
                         status: true,
                         submittedAt: true,
+                    },
+                },
+                parentAppeal: {
+                    select: {
+                        id: true,
+                        round: true,
+                        status: true,
+                        previousScore: true,
+                        newScore: true,
+                        decisionReason: true,
+                        resolvedBy: {
+                            select: {
+                                id: true,
+                                fullName: true,
+                                role: true,
+                            },
+                        },
                     },
                 },
             },
@@ -122,6 +165,25 @@ class AppealService {
                         id: true,
                         fullName: true,
                         email: true,
+                        role: true,
+                    },
+                },
+                parentAppeal: {
+                    select: {
+                        id: true,
+                        round: true,
+                        status: true,
+                        previousScore: true,
+                        newScore: true,
+                        decisionReason: true,
+                        resolvedAt: true,
+                        resolvedBy: {
+                            select: {
+                                id: true,
+                                fullName: true,
+                                role: true,
+                            },
+                        },
                     },
                 },
             },
@@ -148,7 +210,35 @@ class AppealService {
                 submissionId,
                 studentId: userId,
             },
-            orderBy: { createdAt: 'desc' },
+            orderBy: { round: 'asc' },
+            include: {
+                resolvedBy: {
+                    select: {
+                        id: true,
+                        fullName: true,
+                        email: true,
+                        role: true,
+                    },
+                },
+                parentAppeal: {
+                    select: {
+                        id: true,
+                        round: true,
+                        status: true,
+                        previousScore: true,
+                        newScore: true,
+                        decisionReason: true,
+                        resolvedAt: true,
+                        resolvedBy: {
+                            select: {
+                                id: true,
+                                fullName: true,
+                                role: true,
+                            },
+                        },
+                    },
+                },
+            },
         });
     }
     async getLecturerAppeals(lecturerId, role, filters = {}) {
@@ -178,6 +268,12 @@ class AppealService {
         }
         if (filters.status && filters.status !== 'ALL') {
             where.status = filters.status;
+        }
+        if (filters.round) {
+            where.round = Number(filters.round);
+        }
+        if (filters.targetRole && filters.targetRole !== 'ALL') {
+            where.targetRole = filters.targetRole;
         }
         return prisma_1.prisma.appeal.findMany({
             where,
@@ -220,6 +316,25 @@ class AppealService {
                         id: true,
                         fullName: true,
                         email: true,
+                        role: true,
+                    },
+                },
+                parentAppeal: {
+                    select: {
+                        id: true,
+                        round: true,
+                        status: true,
+                        previousScore: true,
+                        newScore: true,
+                        decisionReason: true,
+                        resolvedAt: true,
+                        resolvedBy: {
+                            select: {
+                                id: true,
+                                fullName: true,
+                                role: true,
+                            },
+                        },
                     },
                 },
             },
@@ -268,6 +383,43 @@ class AppealService {
                         id: true,
                         fullName: true,
                         email: true,
+                        role: true,
+                    },
+                },
+                parentAppeal: {
+                    select: {
+                        id: true,
+                        round: true,
+                        status: true,
+                        previousScore: true,
+                        newScore: true,
+                        decisionReason: true,
+                        resolvedAt: true,
+                        resolvedBy: {
+                            select: {
+                                id: true,
+                                fullName: true,
+                                role: true,
+                            },
+                        },
+                    },
+                },
+                childAppeals: {
+                    select: {
+                        id: true,
+                        round: true,
+                        status: true,
+                        previousScore: true,
+                        newScore: true,
+                        decisionReason: true,
+                        resolvedAt: true,
+                        resolvedBy: {
+                            select: {
+                                id: true,
+                                fullName: true,
+                                role: true,
+                            },
+                        },
                     },
                 },
             },
@@ -277,12 +429,12 @@ class AppealService {
         if (role === 'STUDENT' && appeal.studentId !== userId) {
             throw new http_1.HttpError(403, 'Bạn không có quyền xem đơn khiếu nại này.');
         }
-        if (role === 'LECTURER' && appeal.exam.class.lecturerId !== userId) {
+        if (role === 'LECTURER' && appeal.exam.class.lecturerId !== userId && appeal.targetRole !== 'ADMIN') {
             throw new http_1.HttpError(403, 'Khiếu nại không thuộc lớp do bạn phụ trách.');
         }
         return appeal;
     }
-    async resolveAppeal(appealId, lecturerId, role, input) {
+    async resolveAppeal(appealId, resolverId, role, input) {
         if (!['IN_REVIEW', 'ACCEPTED', 'REJECTED'].includes(input.status)) {
             throw new http_1.HttpError(400, 'Trạng thái xử lý không hợp lệ.');
         }
@@ -299,8 +451,21 @@ class AppealService {
         });
         if (!appeal)
             throw new http_1.HttpError(404, 'Không tìm thấy khiếu nại.');
-        if (role !== 'ADMIN' && appeal.exam.class.lecturerId !== lecturerId) {
-            throw new http_1.HttpError(403, 'Bạn không có quyền xử lý khiếu nại của lớp này.');
+        // An appeal that has already been ACCEPTED or REJECTED cannot be modified again
+        if (['ACCEPTED', 'REJECTED'].includes(appeal.status)) {
+            throw new http_1.HttpError(400, 'Đơn khiếu nại này đã có quyết định giải quyết chính thức, không thể sửa đổi kết quả nữa.');
+        }
+        // Permission enforcement:
+        // Round 2 (Khảo thí / Admin) MUST only be resolved by ADMIN.
+        if (appeal.round === 2 || appeal.targetRole === 'ADMIN') {
+            if (role !== 'ADMIN') {
+                throw new http_1.HttpError(403, 'Đơn khiếu nại lần 2 thuộc thẩm quyền xử lý độc lập của Ban Khảo thí (Admin). Giảng viên không có quyền can thiệp.');
+            }
+        }
+        else {
+            if (role !== 'ADMIN' && appeal.exam.class.lecturerId !== resolverId) {
+                throw new http_1.HttpError(403, 'Bạn không có quyền xử lý khiếu nại của lớp này.');
+            }
         }
         if (input.status === 'IN_REVIEW') {
             return prisma_1.prisma.appeal.update({
@@ -308,26 +473,27 @@ class AppealService {
                 data: {
                     status: 'IN_REVIEW',
                     decisionReason: input.decisionReason?.trim() || appeal.decisionReason,
-                    resolvedById: lecturerId,
+                    resolvedById: resolverId,
                 },
             });
         }
         if (input.status === 'ACCEPTED') {
-            if (typeof input.newScore !== 'number' || isNaN(input.newScore) || input.newScore < 0) {
-                throw new http_1.HttpError(400, 'Vui lòng nhập điểm mới hợp lệ (số không âm).');
+            if (typeof input.newScore !== 'number' || isNaN(input.newScore) || input.newScore < 0 || input.newScore > 100) {
+                throw new http_1.HttpError(400, 'Vui lòng nhập điểm mới hợp lệ (từ 0 đến 100).');
             }
             if (!input.decisionReason || input.decisionReason.trim().length === 0) {
                 throw new http_1.HttpError(400, 'Vui lòng cung cấp lý do chấp thuận hoặc nhận xét cho sinh viên.');
             }
             const newScore = Number(input.newScore.toFixed(2));
+            const decisionReason = input.decisionReason.trim();
             return prisma_1.prisma.$transaction(async (tx) => {
                 const updatedAppeal = await tx.appeal.update({
                     where: { id: appealId },
                     data: {
                         status: 'ACCEPTED',
                         newScore,
-                        decisionReason: input.decisionReason?.trim(),
-                        resolvedById: lecturerId,
+                        decisionReason,
+                        resolvedById: resolverId,
                         resolvedAt: new Date(),
                     },
                 });
@@ -338,6 +504,18 @@ class AppealService {
                         totalScore: newScore,
                     },
                 });
+                // Create AuditLog for score override and transparency
+                await tx.auditLog.create({
+                    data: {
+                        action: 'OVERRIDE_SCORE',
+                        entityType: 'SUBMISSION',
+                        entityId: appeal.submissionId,
+                        actorId: resolverId,
+                        oldValue: String(appeal.previousScore),
+                        newValue: String(newScore),
+                        reason: `[Phúc khảo Lần ${appeal.round} - ${appeal.targetRole === 'ADMIN' ? 'Khảo thí' : 'Giảng viên'}] ${decisionReason}`,
+                    },
+                });
                 return updatedAppeal;
             });
         }
@@ -345,14 +523,29 @@ class AppealService {
             if (!input.decisionReason || input.decisionReason.trim().length === 0) {
                 throw new http_1.HttpError(400, 'Vui lòng cung cấp lý do từ chối khiếu nại.');
             }
-            return prisma_1.prisma.appeal.update({
-                where: { id: appealId },
-                data: {
-                    status: 'REJECTED',
-                    decisionReason: input.decisionReason.trim(),
-                    resolvedById: lecturerId,
-                    resolvedAt: new Date(),
-                },
+            const decisionReason = input.decisionReason.trim();
+            return prisma_1.prisma.$transaction(async (tx) => {
+                const updatedAppeal = await tx.appeal.update({
+                    where: { id: appealId },
+                    data: {
+                        status: 'REJECTED',
+                        decisionReason,
+                        resolvedById: resolverId,
+                        resolvedAt: new Date(),
+                    },
+                });
+                await tx.auditLog.create({
+                    data: {
+                        action: 'REJECT_APPEAL',
+                        entityType: 'SUBMISSION',
+                        entityId: appeal.submissionId,
+                        actorId: resolverId,
+                        oldValue: String(appeal.previousScore),
+                        newValue: String(appeal.previousScore),
+                        reason: `[Từ chối phúc khảo Lần ${appeal.round} - ${appeal.targetRole === 'ADMIN' ? 'Khảo thí' : 'Giảng viên'}] ${decisionReason}`,
+                    },
+                });
+                return updatedAppeal;
             });
         }
         throw new http_1.HttpError(400, 'Hành động không hợp lệ.');

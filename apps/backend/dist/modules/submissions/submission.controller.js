@@ -90,7 +90,7 @@ exports.submissionRouter.get('/submissions/:id', auth_middleware_1.authenticateJ
                 scoreReleased: false, scoreReleaseAt: submission.exam.endTime,
                 totalScore: null,
                 compileMessage: isCompileError ? submission.compileMessage : null,
-                aiReviews: isCompileError ? submission.aiReviews : [],
+                aiReviews: submission.aiReviews || [],
                 testResults: [], astStatus: null,
                 astMessage: null, astVersion: null, astK: null, astW: null, _count: { fingerprints: 0 },
             } });

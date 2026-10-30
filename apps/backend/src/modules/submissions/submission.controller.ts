@@ -83,7 +83,7 @@ submissionRouter.get('/submissions/:id', authenticateJwt, asyncRoute(async (req:
       scoreReleased: false, scoreReleaseAt: submission.exam.endTime,
       totalScore: null,
       compileMessage: isCompileError ? submission.compileMessage : null,
-      aiReviews: isCompileError ? submission.aiReviews : [],
+      aiReviews: submission.aiReviews || [],
       testResults: [], astStatus: null,
       astMessage: null, astVersion: null, astK: null, astW: null, _count: { fingerprints: 0 },
     } });
