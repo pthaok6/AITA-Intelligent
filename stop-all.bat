@@ -8,10 +8,11 @@ echo        DANG TAT TOAN BO HE THONG AITA-INTELLIGENT
 echo ========================================================
 echo.
 
-echo [1/3] Dang dung tien trinh Web, Worker va Prisma Studio...
+echo [1/3] Dang dung tien trinh Web, Worker, Prisma Studio va Cloudflare Tunnel...
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr "LISTENING" ^| findstr ":5000 :5173 :5555"') do (
     taskkill /PID %%a /T /F >nul 2>&1
 )
+taskkill /IM cloudflared.exe /F >nul 2>&1
 
 echo [2/3] Dang dung containers Docker (Postgres va Redis)...
 where docker >nul 2>&1
