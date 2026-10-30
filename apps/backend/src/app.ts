@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import { allowedOrigins } from './config';
+import { isAllowedOrigin } from './config';
 import { HttpError, errorHandler } from './shared/http';
 import { rosterImportRouter } from './modules/classes/roster-import.controller';
 import { authRouter } from './modules/auth/auth.controller';
@@ -17,8 +17,8 @@ import { notificationRouter } from './modules/notifications/notification.control
 export const app = express();
 
 app.use(cors({ credentials: true, origin: (origin, callback) => {
-  if (!origin || allowedOrigins().includes(origin)) callback(null, true);
-  else callback(new HttpError(403, 'Nguồn yêu cầu không được cho phép.'));
+  if (isAllowedOrigin(origin)) callback(null, true);
+  else callback(new HttpError(403, 'Nguồn yêu cầu không được phép.'));
 } }));
 app.use(cookieParser());
 app.use(express.json({ limit: '1mb' }));

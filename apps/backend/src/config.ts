@@ -9,6 +9,10 @@ export function allowedDomains(): string[] {
 export function allowedOrigins(): string[] {
   return (process.env.FRONTEND_ORIGINS || 'http://localhost:5173').split(',').map(value => value.trim()).filter(Boolean);
 }
+export function isAllowedOrigin(origin?: string): boolean {
+  if (!origin) return true;
+  return allowedOrigins().includes(origin) || origin.endsWith('.vercel.app') || origin.endsWith('.trycloudflare.com');
+}
 export function secureCookies(): boolean {
   return process.env.NODE_ENV === 'production' || process.env.COOKIE_SECURE === 'true';
 }
