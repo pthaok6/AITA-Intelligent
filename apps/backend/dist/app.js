@@ -21,10 +21,10 @@ const ai_controller_1 = require("./modules/ai/ai.controller");
 const notification_controller_1 = require("./modules/notifications/notification.controller");
 exports.app = (0, express_1.default)();
 exports.app.use((0, cors_1.default)({ credentials: true, origin: (origin, callback) => {
-        if (!origin || (0, config_1.allowedOrigins)().includes(origin))
+        if ((0, config_1.isAllowedOrigin)(origin))
             callback(null, true);
         else
-            callback(new http_1.HttpError(403, 'Nguồn yêu cầu không được cho phép.'));
+            callback(new http_1.HttpError(403, 'Nguồn yêu cầu không được phép.'));
     } }));
 exports.app.use((0, cookie_parser_1.default)());
 exports.app.use(express_1.default.json({ limit: '1mb' }));

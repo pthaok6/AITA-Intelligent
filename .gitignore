@@ -20,3 +20,4 @@ node_modules
 .agents
 .agent
 .impeccable
+cloudflared.log
