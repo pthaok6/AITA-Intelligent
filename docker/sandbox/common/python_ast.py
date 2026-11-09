@@ -17,8 +17,19 @@ for source in sorted(root.rglob('*.py')):
             return  # Docstrings do not contribute fingerprints.
         emit(type(node).__name__ + '{', node)
         if isinstance(node, ast.Constant):
-            value = repr(node.value)
-            emit('CONST:' + type(node.value).__name__ + ':' + value[:128], node)
+            value = node.value
+            if value is None:
+                emit('CONST:NONE', node)
+            elif isinstance(value, bool):
+                emit('CONST:BOOL:' + str(value), node)
+            elif isinstance(value, (int, float, complex)):
+                emit('CONST:NUM:' + type(value).__name__, node)
+            elif isinstance(value, str):
+                emit('CONST:STR', node)
+            elif isinstance(value, bytes):
+                emit('CONST:BYTES', node)
+            else:
+                emit('CONST:' + type(value).__name__, node)
         for field, value in ast.iter_fields(node):
             if isinstance(value, ast.AST):
                 visit(value)

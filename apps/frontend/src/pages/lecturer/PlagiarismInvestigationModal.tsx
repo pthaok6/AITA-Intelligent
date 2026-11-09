@@ -150,7 +150,7 @@ export const PlagiarismInvestigationModal: React.FC<PlagiarismInvestigationModal
                     fontWeight: 700,
                   }}
                 >
-                  AST WINNOWING v1
+                  AST WINNOWING v2
                 </span>
                 <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#f8fafc' }}>
                   Giám định Đạo văn & So sánh Mã nguồn Song song
@@ -223,7 +223,7 @@ export const PlagiarismInvestigationModal: React.FC<PlagiarismInvestigationModal
                 </span>
               </div>
               <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.35rem' }}>
-                Phát hiện <strong>{report.matchedHashesCount}</strong> k-gram hashes AST trùng lặp
+                {report.scoreMethod}: {report.matchedHashesCount} fingerprint trùng. Phủ A: {report.coverageA ?? 0}% · Phủ B: {report.coverageB ?? 0}%
               </div>
             </div>
 
@@ -239,6 +239,10 @@ export const PlagiarismInvestigationModal: React.FC<PlagiarismInvestigationModal
               </div>
             </div>
           </div>
+        </div>
+
+        <div style={{ padding: '0.65rem 1.5rem', color: '#fbbf24', background: '#271d0b', fontSize: '0.8rem' }}>
+          Điểm tương đồng là bằng chứng hỗ trợ để giảng viên xem xét, không phải kết luận tự động. Mã khởi tạo và cấu trúc thuật toán phổ biến có thể làm tăng độ giống nhau.
         </div>
 
         {/* CONTROLS & FILE SELECTOR */}

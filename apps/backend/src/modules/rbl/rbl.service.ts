@@ -23,7 +23,7 @@ results = []
 for source in sorted(root.rglob('*.py')):
     try:
         tree = ast.parse(source.read_text(encoding='utf-8-sig'), filename=source.relative_to(root).as_posix())
-    except Exception:
+    except (SyntaxError, UnicodeError):
         continue
     tokens = []
     def emit(value, node):
@@ -34,7 +34,19 @@ for source in sorted(root.rglob('*.py')):
             return
         emit(type(node).__name__ + '{', node)
         if isinstance(node, ast.Constant):
-            emit('CONST:' + type(node.value).__name__ + ':' + repr(node.value)[:128], node)
+            value = node.value
+            if value is None:
+                emit('CONST:NONE', node)
+            elif isinstance(value, bool):
+                emit('CONST:BOOL:' + str(value), node)
+            elif isinstance(value, (int, float, complex)):
+                emit('CONST:NUM:' + type(value).__name__, node)
+            elif isinstance(value, str):
+                emit('CONST:STR', node)
+            elif isinstance(value, bytes):
+                emit('CONST:BYTES', node)
+            else:
+                emit('CONST:' + type(value).__name__, node)
         for field, value in ast.iter_fields(node):
             if isinstance(value, ast.AST):
                 visit(value)
@@ -84,8 +96,9 @@ export class RblService {
 
   async analyze(submissionId: string) {
     const submission = await prisma.submission.findUniqueOrThrow({ where: { id: submissionId }, include: { exam: true } });
-    if (submission.astStatus === 'COMPLETED' || submission.artifactType !== 'ZIP') return;
     const { k, w } = settings();
+    if (submission.artifactType !== 'ZIP') return;
+    if (submission.astStatus === 'COMPLETED' && submission.astVersion === AST_VERSION && submission.astK === k && submission.astW === w) return;
     await prisma.submission.update({ where: { id: submissionId }, data: { astStatus: 'RUNNING', astMessage: null } });
     try {
       const bundle = await loadBundle(submission.sourceCodeUrl, submission.fileHashSha256, submission.exam.allowedLanguage, submission.entrypoint);
@@ -142,6 +155,7 @@ export class RblService {
   }
 
   async scanExam(examId: string) {
+    const { k, w } = settings();
     const submissions = await prisma.submission.findMany({
       where: { examId, artifactType: 'ZIP' },
       orderBy: { attemptNumber: 'desc' },
@@ -156,7 +170,7 @@ export class RblService {
 
     let analyzedCount = 0;
     for (const sub of latestList) {
-      if (sub.astStatus !== 'COMPLETED') {
+      if (sub.astStatus !== 'COMPLETED' || sub.astVersion !== AST_VERSION || sub.astK !== k || sub.astW !== w) {
         try {
           await this.analyze(sub.id);
           analyzedCount++;
@@ -282,6 +296,11 @@ export class RblService {
       }
     }
 
+    const pairEvidence = similarity(
+      report.submissionA.fingerprints.map(fp => fp.hashValue),
+      report.submissionB.fingerprints.map(fp => fp.hashValue),
+    );
+
     for (const key of Object.keys(highlightedLinesA)) highlightedLinesA[key].sort((a, b) => a - b);
     for (const key of Object.keys(highlightedLinesB)) highlightedLinesB[key].sort((a, b) => a - b);
 
@@ -291,6 +310,9 @@ export class RblService {
         examId: report.examId,
         similarityScore: report.similarityScore,
         matchedHashesCount: report.matchedHashesCount,
+        scoreMethod: 'AST Winnowing + symmetric Dice',
+        coverageA: pairEvidence.coverageA,
+        coverageB: pairEvidence.coverageB,
         status: report.status,
         lecturerNote: report.lecturerNote,
         createdAt: report.createdAt

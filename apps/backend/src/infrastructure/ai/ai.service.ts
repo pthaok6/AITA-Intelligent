@@ -27,7 +27,8 @@ export class AiInfraService {
 
   private async executeWithFallback<T>(
     actionName: string,
-    operation: (provider: IAiProvider) => Promise<T>
+    operation: (provider: IAiProvider) => Promise<T>,
+    allowLocalFallback = true
   ): Promise<T> {
     const preferred = (process.env.AI_PROVIDER || 'auto').toLowerCase();
 
@@ -49,6 +50,12 @@ export class AiInfraService {
       }
     }
 
+    // Code review must use a real model: the local engine is heuristic and
+    // produces placeholder-like scores that should never be persisted as AI feedback.
+    if (!allowLocalFallback) {
+      throw new Error(`Không có AI provider khả dụng cho ${actionName}. Hãy cấu hình Gemini hoặc OpenAI API key, rồi thử lại.`);
+    }
+
     // 3. Fallback to Intelligent Local Engine
     return await operation(this.local);
   }
@@ -62,7 +69,7 @@ export class AiInfraService {
   }
 
   public async reviewCleanCode(input: ReviewCodeInput): Promise<CleanCodeReviewResult> {
-    return this.executeWithFallback('reviewCleanCode', provider => provider.reviewCleanCode(input));
+    return this.executeWithFallback('reviewCleanCode', provider => provider.reviewCleanCode(input), false);
   }
 
   public async explainCompilationError(input: ExplainErrorInput): Promise<ErrorExplanationResult> {

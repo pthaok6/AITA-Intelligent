@@ -1,6 +1,8 @@
 import crypto from 'crypto';
 
-export const AST_VERSION = 'ast-winnowing-v1';
+// Bump this whenever canonicalization changes so queued/existing submissions
+// get re-parsed instead of comparing fingerprints produced by different rules.
+export const AST_VERSION = 'ast-winnowing-v2';
 export interface AstToken { value: string; line: number; endLine: number }
 export interface Fingerprint { hashValue: bigint; tokenStart: number; tokenEnd: number; lineStart: number; lineEnd: number }
 export function settings() {
@@ -34,5 +36,13 @@ export function winnow(tokens: AstToken[], k = 5, w = 4): Fingerprint[] {
 export function similarity(a: Iterable<bigint>, b: Iterable<bigint>) {
   const left = new Set([...a].map(String)), right = new Set([...b].map(String));
   const matched = [...left].filter(hash => right.has(hash)).length;
-  return { matched, score: left.size && right.size ? Math.round(10000 * matched / Math.min(left.size, right.size)) / 100 : 0 };
+  // Symmetric Dice score: a small submission cannot score 100% merely because
+  // all of its fingerprints happen to occur in a much larger submission.
+  const score = left.size + right.size ? 200 * matched / (left.size + right.size) : 0;
+  return {
+    matched,
+    score: Math.round(score * 100) / 100,
+    coverageA: left.size ? Math.round(10000 * matched / left.size) / 100 : 0,
+    coverageB: right.size ? Math.round(10000 * matched / right.size) / 100 : 0,
+  };
 }

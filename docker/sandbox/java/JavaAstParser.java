@@ -43,7 +43,18 @@ public class JavaAstParser {
             if (node == null) return null;
             emit(node.getKind().name() + "{", node);
             if (node instanceof IdentifierTree || node instanceof MemberSelectTree) emit("ID", node);
-            if (node instanceof LiteralTree literal) emit("CONST:" + String.valueOf(literal.getValue()), node);
+            if (node instanceof LiteralTree literal) {
+              String kind = switch (node.getKind()) {
+                case INT_LITERAL, LONG_LITERAL -> "CONST:NUM:integer";
+                case FLOAT_LITERAL, DOUBLE_LITERAL -> "CONST:NUM:floating";
+                case CHAR_LITERAL -> "CONST:CHAR";
+                case STRING_LITERAL -> "CONST:STR";
+                case BOOLEAN_LITERAL -> "CONST:BOOL:" + literal.getValue();
+                case NULL_LITERAL -> "CONST:NONE";
+                default -> "CONST:" + node.getKind().name();
+              };
+              emit(kind, node);
+            }
             super.scan(node, unused);
             emit("}", node);
             return null;
@@ -51,9 +62,6 @@ public class JavaAstParser {
         }.scan(unit, null);
         String name = root.relativize(Path.of(unit.getSourceFile().toUri())).toString().replace('\\','/');
         files.add("{\"path\":" + quote(name) + ",\"tokens\":[" + String.join(",", tokens) + "]}");
-      }
-      if (errors.getDiagnostics().stream().anyMatch(d -> d.getKind() == Diagnostic.Kind.ERROR)) {
-        errors.getDiagnostics().forEach(System.err::println); System.exit(1);
       }
       System.out.println("{\"files\":[" + String.join(",", files) + "]}");
     }

@@ -7,8 +7,6 @@ var root = "/work/src";
 foreach (var file in Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories).Order())
 {
     var tree = CSharpSyntaxTree.ParseText(File.ReadAllText(file), new CSharpParseOptions(LanguageVersion.CSharp12));
-    var errors = tree.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
-    if (errors.Length > 0) { Console.Error.WriteLine(string.Join("\n", errors.Select(e => e.ToString()))); Environment.Exit(1); }
     var tokens = new List<object>();
     void Emit(string value, TextSpanWrapper location)
     {
@@ -24,7 +22,14 @@ foreach (var file in Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDire
             else
             {
                 var token = child.AsToken();
-                var value = token.IsKind(SyntaxKind.IdentifierToken) ? "ID" : token.Kind() + ":" + token.ValueText;
+                var value = token.IsKind(SyntaxKind.IdentifierToken) ? "ID"
+                    : token.IsKind(SyntaxKind.NumericLiteralToken) ? "CONST:NUM"
+                    : token.IsKind(SyntaxKind.StringLiteralToken) ? "CONST:STR"
+                    : token.IsKind(SyntaxKind.CharacterLiteralToken) ? "CONST:CHAR"
+                    : token.IsKind(SyntaxKind.TrueKeyword) ? "CONST:BOOL:true"
+                    : token.IsKind(SyntaxKind.FalseKeyword) ? "CONST:BOOL:false"
+                    : token.IsKind(SyntaxKind.NullKeyword) ? "CONST:NONE"
+                    : token.Kind() + ":" + token.ValueText;
                 Emit(value.Length > 160 ? value[..160] : value, new(token.Span));
             }
         }
