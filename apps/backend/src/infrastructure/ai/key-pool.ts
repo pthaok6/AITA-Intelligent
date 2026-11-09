@@ -21,20 +21,24 @@ export function maskApiKey(key: string): string {
 export async function probeKeyConnection(provider: 'gemini' | 'openai', key: string): Promise<{ success: boolean; message: string }> {
   try {
     if (provider === 'gemini') {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
+      const model = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
       const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
         body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: 'ping' }] }],
-          generationConfig: { maxOutputTokens: 2 },
+          contents: [{ role: 'user', parts: [{ text: 'Return JSON: {"ok":true}' }] }],
+          generationConfig: { responseMimeType: 'application/json', temperature: 0.2 },
         }),
+        signal: AbortSignal.timeout(10000),
       });
       if (res.ok) {
-        return { success: true, message: 'Kết nối Gemini API thành công (HTTP 200 OK).' };
+        return { success: true, message: `Gemini review probe succeeded with ${model} and JSON mode (HTTP ${res.status}).` };
       }
       const err = await res.text();
-      return { success: false, message: `Lỗi kết nối Gemini (HTTP ${res.status}): ${err.slice(0, 150)}` };
+      let detail = err;
+      try { detail = JSON.parse(err).error?.message || err; } catch { /* Keep provider response text. */ }
+      return { success: false, message: `Gemini HTTP ${res.status} for ${model}: ${detail.slice(0, 300)}` };
     } else {
       const url = 'https://api.openai.com/v1/models';
       const res = await fetch(url, {

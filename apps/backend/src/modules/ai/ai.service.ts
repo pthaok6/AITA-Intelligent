@@ -84,6 +84,10 @@ export class AiModuleService {
       }
     }
 
+    if (!files.some(file => file.content.trim())) {
+      throw new HttpError(422, 'No readable source code files were found in this submission ZIP.');
+    }
+
     // Run Semantic Clean Code review
     const cleanCode = await this.infra.reviewCleanCode({
       submissionId,

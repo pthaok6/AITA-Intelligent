@@ -69,7 +69,7 @@ export class GeminiProvider implements IAiProvider {
       const key = keyPool.getGeminiKey();
       if (!key) break;
 
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${key}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
       const payload: any = {
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
@@ -87,14 +87,17 @@ export class GeminiProvider implements IAiProvider {
       try {
         const response = await fetch(url, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
           body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(100000),
         });
 
         if (!response.ok) {
           const errorText = await response.text();
           if (response.status === 429) {
             keyPool.markGeminiKeyFailed(key, true);
+          } else if ([400, 401, 403].includes(response.status)) {
+            keyPool.markGeminiKeyFailed(key, false);
           }
           // If 503 (high demand), 429 (rate limit), 404 (deprecated), or 5xx (Google server error), auto-fallback to next model
           if ([404, 429, 500, 502, 503, 504].includes(response.status)) {
@@ -107,7 +110,11 @@ export class GeminiProvider implements IAiProvider {
 
         const data: any = await response.json();
         const candidate = data.candidates?.[0];
-        const text = candidate?.content?.parts?.[0]?.text || '{}';
+        const text = candidate?.content?.parts?.map((part: any) => part.text).filter(Boolean).join('\n') || '';
+        if (!text.trim()) {
+          const reason = candidate?.finishReason || data.promptFeedback?.blockReason || 'EMPTY_RESPONSE';
+          throw new Error(`Gemini returned no text for ${modelName} (reason: ${reason}).`);
+        }
         const tokensUsed = data.usageMetadata?.totalTokenCount || 500;
         this.name = modelName;
 
@@ -261,11 +268,14 @@ Trả về JSON thuần:
 
     const { text, tokensUsed } = await this.callGemini(prompt, system);
     const parsed = safeJsonParse(text);
+    if (typeof parsed.cleanCodeScore !== 'number' || !parsed.solidAnalysis || !parsed.suggestions || !Array.isArray(parsed.codeSmells)) {
+      throw new Error(`Gemini response for code review did not match the required schema (model: ${this.name}).`);
+    }
     return {
-      cleanCodeScore: typeof parsed.cleanCodeScore === 'number' ? parsed.cleanCodeScore : 8.0,
-      solidAnalysis: parsed.solidAnalysis || '',
-      suggestions: parsed.suggestions || '',
-      codeSmells: parsed.codeSmells || [],
+      cleanCodeScore: Math.max(0, Math.min(10, parsed.cleanCodeScore)),
+      solidAnalysis: parsed.solidAnalysis,
+      suggestions: parsed.suggestions,
+      codeSmells: parsed.codeSmells,
       modelUsed: this.name,
       tokensUsed,
     };

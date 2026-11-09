@@ -128,8 +128,16 @@ aiRouter.post(
       await classAccess(submission.exam.classId, req.user!, true);
     }
 
-    const reviewResult = await aiModuleService.reviewSubmission(submissionId);
-    res.json({ success: true, data: reviewResult });
+    try {
+      const reviewResult = await aiModuleService.reviewSubmission(submissionId);
+      res.json({ success: true, data: reviewResult });
+    } catch (error: any) {
+      if (error instanceof HttpError) throw error;
+      const message = String(error?.message || 'Unknown processing error')
+        .replace(/(?:AQ\.[A-Za-z0-9._-]+|AIza[A-Za-z0-9_-]+)/g, '[API KEY]')
+        .slice(0, 400);
+      throw new HttpError(500, `AI review processing failed: ${message}`);
+    }
   })
 );
 

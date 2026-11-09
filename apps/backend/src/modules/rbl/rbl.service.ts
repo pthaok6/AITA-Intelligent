@@ -159,7 +159,7 @@ export class RblService {
     const submissions = await prisma.submission.findMany({
       where: { examId, artifactType: 'ZIP' },
       orderBy: { attemptNumber: 'desc' },
-      select: { id: true, studentId: true, astStatus: true }
+      select: { id: true, studentId: true, astStatus: true, astVersion: true, astK: true, astW: true }
     });
 
     const latestByStudent = new Map<string, typeof submissions[number]>();

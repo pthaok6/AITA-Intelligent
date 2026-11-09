@@ -42,6 +42,7 @@ export const SubmissionResultPage: React.FC = () => {
 
   // AI Review States
   const [triggeringAiReview, setTriggeringAiReview] = useState(false);
+  const [aiReviewNotice, setAiReviewNotice] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [explainingError, setExplainingError] = useState(false);
   const [manualExplanation, setManualExplanation] = useState<any>(null);
 
@@ -160,15 +161,23 @@ export const SubmissionResultPage: React.FC = () => {
   // Trigger on-demand AI Semantic Review
   const handleTriggerAiReview = async () => {
     setTriggeringAiReview(true);
+    setAiReviewNotice({ type: 'info', text: 'Sending source code to Gemini for review...' });
     try {
       const res = await apiRequest(`/ai/review-submission/${id}`, { method: 'POST' });
       if (res.success) {
-        await loadSubmission();
+        const review = res.data?.review;
+        if (!review) throw new Error('Gemini completed the review, but the API returned no saved review record.');
+        const model = res.data?.cleanCode?.modelUsed || review.modelName || 'AI provider';
+        setSubmission((current: any) => current ? {
+          ...current,
+          aiReviews: [review, ...(current.aiReviews || []).filter((existing: any) => existing.id !== review.id)],
+        } : current);
+        setAiReviewNotice({ type: 'success', text: `Review completed with ${model}. The result is shown below.` });
       } else {
-        alert(res.message || 'Không thể thực hiện AI Review.');
+        setAiReviewNotice({ type: 'error', text: res.message || 'AI review failed.' });
       }
     } catch (err: any) {
-      alert(err.message || 'Lỗi khi gọi AI Review.');
+      setAiReviewNotice({ type: 'error', text: err.message || 'AI review request failed.' });
     } finally {
       setTriggeringAiReview(false);
     }
@@ -294,6 +303,11 @@ export const SubmissionResultPage: React.FC = () => {
             </Link>
           )}
         </div>
+        {waiting && (
+          <span role="status" style={{ color: '#93c5fd', fontSize: '0.85rem' }}>
+            AI review will be available after submission processing finishes.
+          </span>
+        )}
         {!waiting && (
           <button
             type="button"
@@ -311,6 +325,17 @@ export const SubmissionResultPage: React.FC = () => {
           </button>
         )}
       </div>
+
+      {aiReviewNotice && (
+        <div role="status" aria-live="polite" style={{
+          padding: '0.75rem 1rem', marginBottom: '1rem', borderRadius: '0.5rem', whiteSpace: 'pre-wrap',
+          background: aiReviewNotice.type === 'error' ? 'rgba(239, 68, 68, 0.1)' : aiReviewNotice.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+          border: `1px solid ${aiReviewNotice.type === 'error' ? '#ef4444' : aiReviewNotice.type === 'success' ? '#10b981' : '#3b82f6'}`,
+          color: aiReviewNotice.type === 'error' ? '#f87171' : aiReviewNotice.type === 'success' ? '#34d399' : '#93c5fd',
+        }}>
+          {aiReviewNotice.text}
+        </div>
+      )}
 
       {appealSuccess && (
         <div className="card" style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid #10b981', color: '#34d399', marginBottom: '1rem', padding: '0.75rem 1rem' }}>
