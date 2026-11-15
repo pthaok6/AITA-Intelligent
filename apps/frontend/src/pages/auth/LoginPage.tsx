@@ -10,6 +10,8 @@ export const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [busyEmail, setBusyEmail] = useState<string | null>(null);
+  const [demoError, setDemoError] = useState('');
 
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -41,6 +43,35 @@ export const LoginPage: React.FC = () => {
     } else {
       setError(res.message || 'Email hoặc mật khẩu không chính xác.');
     }
+  };
+
+  const demoAccounts = [
+    { label: 'Admin Test', key: 'admin', email: 'admin.test@fpt.edu.vn' },
+    { label: 'Lecturer Test', key: 'lecturer', email: 'lecturer.test@fpt.edu.vn' },
+    { label: 'Student Test', key: 'student', email: 'student.test@fpt.edu.vn' },
+  ];
+
+  const loginDemo = async (key: string, demoEmail: string) => {
+    setBusyEmail(demoEmail);
+    setDemoError('');
+    const result = await apiRequest('/auth/demo-login', {
+      method: 'POST',
+      body: JSON.stringify({ account: key }),
+    });
+    setBusyEmail(null);
+    if (!result.success || !result.data) {
+      setDemoError(result.message || 'Không thể đăng nhập tài khoản demo.');
+      return;
+    }
+    login(result.data.token, result.data.user, result.data.refreshToken);
+    navigate(
+      result.data.user.role === 'ADMIN'
+        ? '/admin'
+        : result.data.user.role === 'LECTURER'
+        ? '/lecturer'
+        : '/student',
+      { replace: true }
+    );
   };
 
   return (
@@ -113,7 +144,7 @@ export const LoginPage: React.FC = () => {
             <input
               type="email"
               className="form-control"
-              placeholder="Nhập email FPT / FE của bạn"
+              placeholder="VD: admin.test@fpt.edu.vn"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -126,7 +157,7 @@ export const LoginPage: React.FC = () => {
               <input
                 type={showPassword ? 'text' : 'password'}
                 className="form-control"
-                placeholder="Nhập mật khẩu của bạn"
+                placeholder="Nhập mật khẩu (Mặc định: AitaTest@123)"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -151,17 +182,17 @@ export const LoginPage: React.FC = () => {
                 title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
               >
                 {showPassword ? (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                    <line x1="1" y1="1" x2="23" y2="23" />
-                  </svg>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                 ) : (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </svg>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                 )}
               </button>
+            </div>
+            <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Điền nhanh:</span>
+              <button type="button" className="btn btn-secondary btn-sm" style={{ padding: '0.15rem 0.5rem', fontSize: '0.75rem' }} onClick={() => { setEmail('admin.test@fpt.edu.vn'); setPassword('AitaTest@123'); }}>Admin</button>
+              <button type="button" className="btn btn-secondary btn-sm" style={{ padding: '0.15rem 0.5rem', fontSize: '0.75rem' }} onClick={() => { setEmail('lecturer.test@fpt.edu.vn'); setPassword('AitaTest@123'); }}>Lecturer</button>
+              <button type="button" className="btn btn-secondary btn-sm" style={{ padding: '0.15rem 0.5rem', fontSize: '0.75rem' }} onClick={() => { setEmail('student.test@fpt.edu.vn'); setPassword('AitaTest@123'); }}>Student</button>
             </div>
           </div>
 
@@ -193,7 +224,56 @@ export const LoginPage: React.FC = () => {
         {/* 3. Google SSO */}
         <GoogleSignIn />
 
-        {/* 4. Footer Note */}
+        {/* 4. Quick Demo Login for Local Development */}
+        {import.meta.env.DEV && (
+          <section
+            aria-label="Đăng nhập nhanh tài khoản demo"
+            style={{
+              marginTop: '1.5rem',
+              paddingTop: '1.25rem',
+              borderTop: '1px solid var(--border, rgba(255,255,255,0.1))',
+              textAlign: 'left',
+            }}
+          >
+            <h3 style={{ fontSize: '0.9rem', margin: '0 0 0.35rem 0', color: '#f8fafc' }}>
+              Đăng nhập nhanh 1-Click (Demo Local)
+            </h3>
+            <p style={{ color: '#94a3b8', fontSize: '0.78rem', margin: '0 0 0.75rem 0' }}>
+              Bấm tài khoản mẫu bên dưới để vào thẳng hệ thống:
+            </p>
+            {demoError && (
+              <p role="alert" style={{ color: '#f87171', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                {demoError}
+              </p>
+            )}
+            <div style={{ display: 'grid', gap: '0.45rem' }}>
+              {demoAccounts.map((account) => (
+                <button
+                  key={account.email}
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={busyEmail !== null}
+                  onClick={() => void loginDemo(account.key, account.email)}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.45rem 0.75rem',
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  <span style={{ fontWeight: 600 }}>
+                    {busyEmail === account.email ? 'Đang vào…' : account.label}
+                  </span>
+                  <span style={{ color: '#94a3b8', fontSize: '0.78rem' }}>{account.email}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
         <div
           style={{
             marginTop: '1.5rem',
@@ -205,7 +285,7 @@ export const LoginPage: React.FC = () => {
             lineHeight: 1.5,
           }}
         >
-          Hệ thống quản lý tài khoản nội bộ và không mở đăng ký tự do. Nếu tài khoản chưa có trong hệ thống, vui lòng liên hệ Giảng viên bộ môn hoặc Quản trị viên để được cấp quyền.
+          Hệ thống AITA quản lý người dùng theo danh sách lớp học. Tài khoản demo dùng mật khẩu: <code>AitaTest@123</code>.
         </div>
       </div>
     </div>
